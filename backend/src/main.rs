@@ -1,4 +1,5 @@
-use api::{debug_llm, health, sessions};
+use crate::agent::planner::PlannerService;
+use api::{debug_llm, debug_plan, health, sessions};
 use axum::{
     Router,
     routing::{get, post},
@@ -10,6 +11,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::services::{llm::LlmService, session_store::SessionStore};
 
+pub mod agent;
 pub mod api;
 pub mod config;
 pub mod error;
@@ -31,12 +33,14 @@ async fn main() -> anyhow::Result<()> {
     let redis_client = redis::Client::open(config.redis_url.clone())?;
     let session_store = SessionStore::new(redis_client, config.session_ttl);
 
-    let llm = LlmService::new(config.ollama_url, config.ollama_model);
+    let llm = LlmService::new(config.ollama_url.clone(), config.ollama_model.clone());
+    let planner = PlannerService::new(llm.clone());
 
     let state = AppState {
         app_name: "ai-rust-agent".to_string(),
         sessions: session_store,
         llm: llm,
+        planner: planner,
     };
 
     let app = Router::new()
@@ -48,6 +52,7 @@ async fn main() -> anyhow::Result<()> {
         )
         .route("/reset/{session_id}", post(sessions::reset_session_handler))
         .route("/debug/llm", post(debug_llm::debug_llm_handler))
+        .route("/debug/plan", post(debug_plan::debug_plan_handler))
         .layer(TraceLayer::new_for_http())
         .with_state(state);
 

@@ -1,4 +1,5 @@
 use reqwest::Client;
+use serde::de::DeserializeOwned;
 
 use crate::{
     error::BackendError,
@@ -27,6 +28,7 @@ impl LlmService {
             messages,
             stream: false,
             keep_alive: "10m".to_string(),
+            format: None,
         };
 
         tracing::info!("sending request to ollama: model={}", self.model);
@@ -41,6 +43,34 @@ impl LlmService {
             .await?;
 
         Ok(response.message.content)
+    }
+
+    pub async fn chat_json<T: DeserializeOwned>(
+        &self,
+        messages: Vec<OllamaMessage>,
+        schema: serde_json::Value,
+    ) -> Result<T, BackendError> {
+        let request = OllamaChatRequest {
+            model: self.model.clone(),
+            messages,
+            stream: false,
+            keep_alive: "10m".to_string(),
+            format: Some(schema),
+        };
+
+        let response = self
+            .http
+            .post(format!("{}/api/chat", self.base_url))
+            .json(&request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json::<OllamaChatResponse>()
+            .await?;
+
+        let parsed = serde_json::from_str::<T>(&response.message.content)?;
+
+        Ok(parsed)
     }
 
     pub async fn simple_user_prompt(&self, prompt: &str) -> Result<String, BackendError> {

@@ -12,6 +12,8 @@ pub struct OllamaChatRequest {
     pub messages: Vec<OllamaMessage>,
     pub stream: bool,
     pub keep_alive: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub format: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
