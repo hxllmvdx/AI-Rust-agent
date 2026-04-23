@@ -1,0 +1,17 @@
+services:
+    redis:
+        image: redis:7-alpine
+        ports:
+            - "6379:6379"
+
+    backend:
+        build: ./backend
+        depends_on:
+            - redis
+        environment:
+            HOST: 0.0.0.0
+            PORT: 8080
+            REDIS_URL: redis://redis:6379
+            SESSION_TTL_SECS: 86400
+        ports:
+            - "8080:8080"
