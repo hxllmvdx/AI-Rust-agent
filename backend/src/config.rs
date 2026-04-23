@@ -10,11 +10,19 @@ fn default_host() -> String {
 }
 
 fn default_redis_url() -> String {
-    "redis://localhost:6379/".to_string()
+    "redis://redis:6379/".to_string()
 }
 
 fn default_session_ttl() -> u64 {
     60 * 60 * 24
+}
+
+fn default_ollama_url() -> String {
+    "http://ollama:11434".to_string()
+}
+
+fn default_ollama_model() -> String {
+    "qwen3:8b".to_string()
 }
 
 #[derive(Deserialize, Debug)]
@@ -30,6 +38,12 @@ pub struct Config {
 
     #[serde(default = "default_session_ttl")]
     pub session_ttl: u64,
+
+    #[serde(default = "default_ollama_url")]
+    pub ollama_url: String,
+
+    #[serde(default = "default_ollama_model")]
+    pub ollama_model: String,
 }
 
 impl Config {

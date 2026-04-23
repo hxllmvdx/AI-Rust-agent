@@ -1,4 +1,4 @@
-use api::{health, sessions};
+use api::{debug_llm, health, sessions};
 use axum::{
     Router,
     routing::{get, post},
@@ -6,9 +6,9 @@ use axum::{
 use state::AppState;
 use tokio::net::TcpListener;
 use tower_http::trace::TraceLayer;
-use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use crate::services::session_store::SessionStore;
+use crate::services::{llm::LlmService, session_store::SessionStore};
 
 pub mod api;
 pub mod config;
@@ -20,8 +20,10 @@ pub mod state;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::registry()
-        .with(EnvFilter::from_default_env())
-        .with(fmt::layer())
+        .with(tracing_subscriber::EnvFilter::new(
+            std::env::var("RUST_LOG").unwrap_or_else(|_| "info,tower_http=debug".into()),
+        ))
+        .with(tracing_subscriber::fmt::layer())
         .init();
 
     let config = config::Config::from_env()?;
@@ -29,9 +31,12 @@ async fn main() -> anyhow::Result<()> {
     let redis_client = redis::Client::open(config.redis_url.clone())?;
     let session_store = SessionStore::new(redis_client, config.session_ttl);
 
+    let llm = LlmService::new(config.ollama_url, config.ollama_model);
+
     let state = AppState {
         app_name: "ai-rust-agent".to_string(),
         sessions: session_store,
+        llm: llm,
     };
 
     let app = Router::new()
@@ -42,6 +47,7 @@ async fn main() -> anyhow::Result<()> {
             get(sessions::create_session_handler),
         )
         .route("/reset/{session_id}", post(sessions::reset_session_handler))
+        .route("/debug/llm", post(debug_llm::debug_llm_handler))
         .layer(TraceLayer::new_for_http())
         .with_state(state);
 

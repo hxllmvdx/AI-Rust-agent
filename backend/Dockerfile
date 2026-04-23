@@ -1,4 +1,4 @@
-FROM rust:1.94 AS builder
+FROM rust:1.94-bookworm AS builder
 WORKDIR /app
 
 COPY Cargo.toml Cargo.lock ./
@@ -8,6 +8,10 @@ RUN cargo build --release
 
 FROM debian:bookworm-slim
 WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/target/release/backend /usr/local/bin/backend
 

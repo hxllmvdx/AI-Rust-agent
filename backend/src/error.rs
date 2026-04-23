@@ -13,4 +13,7 @@ pub enum BackendError {
 
     #[error("session not found")]
     SessionNotFound,
+
+    #[error("http client error: {0}")]
+    ReqwestError(#[from] reqwest::Error),
 }
