@@ -188,6 +188,13 @@ fn rewrite_tool_queries(user_message: &str, plan: &mut ToolPlan) {
                 &tool.arguments.query
             };
             tool.arguments.query = build_github_query(source);
+        } else if tool.name == "crates_search" {
+            let source = if tool.arguments.query.trim().is_empty() {
+                user_message
+            } else {
+                &tool.arguments.query
+            };
+            tool.arguments.query = build_crates_query(source);
         }
     }
 }
@@ -196,7 +203,7 @@ fn retain_supported_tools(plan: &mut ToolPlan) {
     plan.tools.retain(|tool| {
         matches!(
             tool.name.as_str(),
-            "github_search" | "local_knowledge_search"
+            "github_search" | "local_knowledge_search" | "crates_search"
         )
     });
 }
@@ -213,6 +220,26 @@ fn build_github_query(input: &str) -> String {
     }
 
     "rust backend".to_string()
+}
+
+fn build_crates_query(input: &str) -> String {
+    let mut terms = preferred_crates_terms(input);
+    expand_crates_terms(input, &mut terms);
+    dedup_terms(&mut terms);
+    if !terms.is_empty() {
+        terms.truncate(8);
+        return terms.join(" ");
+    }
+
+    let mut fallback = generic_crates_terms(input);
+    expand_crates_terms(input, &mut fallback);
+    dedup_terms(&mut fallback);
+    if !fallback.is_empty() {
+        fallback.truncate(8);
+        return fallback.join(" ");
+    }
+
+    "rust library".to_string()
 }
 
 fn preferred_github_terms(input: &str) -> Vec<String> {
@@ -270,6 +297,164 @@ fn preferred_github_terms(input: &str) -> Vec<String> {
     }
 
     selected
+}
+
+fn preferred_crates_terms(input: &str) -> Vec<String> {
+    let normalized = normalize(input);
+    let ordered_terms = [
+        "rust",
+        "config",
+        "configuration",
+        "env",
+        "environment",
+        "secret",
+        "secrets",
+        "cli",
+        "command",
+        "parsing",
+        "terminal",
+        "tracing",
+        "metrics",
+        "logging",
+        "observability",
+        "correlation",
+        "database",
+        "databases",
+        "sql",
+        "orm",
+        "postgres",
+        "mysql",
+        "sqlite",
+        "auth",
+        "authentication",
+        "cache",
+        "queue",
+        "serialization",
+        "json",
+        "toml",
+        "yaml",
+        "framework",
+        "frameworks",
+        "library",
+        "libraries",
+    ];
+
+    let mut selected = Vec::new();
+    for term in ordered_terms {
+        if normalized.contains(term) && !selected.iter().any(|item| item == term) {
+            selected.push(term.to_string());
+        }
+
+        if selected.len() >= 6 {
+            break;
+        }
+    }
+
+    selected
+}
+
+fn expand_crates_terms(input: &str, terms: &mut Vec<String>) {
+    let normalized = normalize(input);
+
+    if contains_any_phrase(
+        &normalized,
+        &[
+            "config",
+            "configuration",
+            "env",
+            "environment",
+            "secret",
+            "secrets",
+            "settings",
+        ],
+    ) {
+        terms.extend(
+            [
+                "config",
+                "configuration",
+                "figment",
+                "confique",
+                "dotenvy",
+                "secrecy",
+            ]
+            .into_iter()
+            .map(str::to_string),
+        );
+    }
+
+    if contains_any_phrase(
+        &normalized,
+        &[
+            "metrics",
+            "metric",
+            "tracing",
+            "trace",
+            "log correlation",
+            "correlation",
+            "logging",
+            "observability",
+            "telemetry",
+        ],
+    ) {
+        terms.extend(
+            [
+                "metrics",
+                "tracing",
+                "tracing-subscriber",
+                "opentelemetry",
+                "tower-http",
+                "axum-tracing-opentelemetry",
+            ]
+            .into_iter()
+            .map(str::to_string),
+        );
+    }
+
+    if contains_any_phrase(
+        &normalized,
+        &[
+            "database",
+            "databases",
+            "sql",
+            "orm",
+            "postgres",
+            "mysql",
+            "sqlite",
+        ],
+    ) {
+        terms.extend(
+            [
+                "sqlx", "diesel", "sea-orm", "seaorm", "postgres", "sqlite", "mysql",
+            ]
+            .into_iter()
+            .map(str::to_string),
+        );
+    }
+
+    if contains_any_phrase(
+        &normalized,
+        &[
+            "cli",
+            "command line",
+            "argument parsing",
+            "terminal",
+            "console",
+        ],
+    ) {
+        terms.extend(
+            ["clap", "argh", "bpaf", "dialoguer", "ratatui"]
+                .into_iter()
+                .map(str::to_string),
+        );
+    }
+
+    if contains_any_phrase(&normalized, &["auth", "authentication", "jwt", "session"]) {
+        terms.extend(
+            ["jsonwebtoken", "axum-login", "oauth2", "argon2", "pasetors"]
+                .into_iter()
+                .map(str::to_string),
+        );
+    }
 }
 
 fn generic_github_terms(input: &str) -> Vec<String> {
@@ -341,6 +526,85 @@ fn generic_github_terms(input: &str) -> Vec<String> {
     }
 
     selected
+}
+
+fn generic_crates_terms(input: &str) -> Vec<String> {
+    let stop_words = [
+        "a",
+        "about",
+        "advice",
+        "also",
+        "an",
+        "and",
+        "are",
+        "best",
+        "building",
+        "can",
+        "choose",
+        "concrete",
+        "evaluate",
+        "for",
+        "from",
+        "give",
+        "help",
+        "i",
+        "in",
+        "libraries",
+        "library",
+        "me",
+        "modern",
+        "need",
+        "pick",
+        "please",
+        "practical",
+        "production",
+        "recommend",
+        "related",
+        "service",
+        "should",
+        "some",
+        "stack",
+        "the",
+        "things",
+        "use",
+        "useful",
+        "what",
+        "which",
+        "with",
+    ];
+
+    let mut selected = Vec::new();
+    for token in tokenize(&normalize(input)) {
+        if token.len() < 3 {
+            continue;
+        }
+        if stop_words.contains(&token.as_str()) {
+            continue;
+        }
+        if !selected.iter().any(|item| item == &token) {
+            selected.push(token);
+        }
+        if selected.len() >= 6 {
+            break;
+        }
+    }
+
+    if !selected.iter().any(|item| item == "rust") {
+        selected.insert(0, "rust".to_string());
+    }
+
+    selected
+}
+
+fn contains_any_phrase(message: &str, phrases: &[&str]) -> bool {
+    phrases
+        .iter()
+        .any(|phrase| contains_phrase(message, phrase))
+}
+
+fn dedup_terms(terms: &mut Vec<String>) {
+    let mut seen = HashSet::new();
+    terms.retain(|term| seen.insert(term.clone()));
 }
 
 fn debug_tools(plan: &mut ToolPlan) {

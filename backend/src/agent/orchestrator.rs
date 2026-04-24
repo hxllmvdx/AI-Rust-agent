@@ -9,7 +9,7 @@ use crate::{
         tool::ToolCall,
     },
     services::session_store::SessionStore,
-    tools::{github::GitHubTool, local_data::LocalKnowledgeTool},
+    tools::{crates::CratesTool, github::GitHubTool, local_data::LocalKnowledgeTool},
 };
 
 use super::{planner::PlannerService, synthesizer::SynthesizerService};
@@ -20,6 +20,7 @@ pub struct OrchestratorService {
     synthesizer: SynthesizerService,
     local_tool: LocalKnowledgeTool,
     github_tool: GitHubTool,
+    crates_tool: CratesTool,
     sessions: SessionStore,
 }
 
@@ -29,6 +30,7 @@ impl OrchestratorService {
         synthesizer: SynthesizerService,
         local_tool: LocalKnowledgeTool,
         github_tool: GitHubTool,
+        crates_tool: CratesTool,
         sessions: SessionStore,
     ) -> Self {
         Self {
@@ -36,6 +38,7 @@ impl OrchestratorService {
             synthesizer,
             local_tool,
             github_tool,
+            crates_tool,
             sessions,
         }
     }
@@ -209,6 +212,22 @@ impl OrchestratorService {
                 }
             }
             "github_search" => match self.github_tool.search(&tool_call.arguments.query, 5).await {
+                Ok(result) => match to_value(result) {
+                    Ok(payload) => ToolExecutionResult::success(tool_call.name.clone(), payload),
+                    Err(err) => {
+                        tracing::warn!("tool {} failed: {:?}", tool_call.name, err);
+                        ToolExecutionResult::failure(
+                            tool_call.name.clone(),
+                            format!("serialization failed: {err}"),
+                        )
+                    }
+                },
+                Err(err) => {
+                    tracing::warn!("tool {} failed: {:?}", tool_call.name, err);
+                    ToolExecutionResult::failure(tool_call.name.clone(), err.to_string())
+                }
+            },
+            "crates_search" => match self.crates_tool.search(&tool_call.arguments.query, 5).await {
                 Ok(result) => match to_value(result) {
                     Ok(payload) => ToolExecutionResult::success(tool_call.name.clone(), payload),
                     Err(err) => {

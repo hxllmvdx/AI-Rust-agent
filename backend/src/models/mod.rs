@@ -1,4 +1,5 @@
 pub mod chat;
+pub mod crates;
 pub mod execution;
 pub mod github;
 pub mod local_data;

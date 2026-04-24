@@ -3,7 +3,7 @@ use crate::agent::{
 };
 use crate::services::llm::LlmService;
 use crate::services::session_store::SessionStore;
-use crate::tools::{github::GitHubTool, local_data::LocalKnowledgeTool};
+use crate::tools::{crates::CratesTool, github::GitHubTool, local_data::LocalKnowledgeTool};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -14,5 +14,6 @@ pub struct AppState {
     pub synthesizer: SynthesizerService,
     pub local_tool: LocalKnowledgeTool,
     pub github_tool: GitHubTool,
+    pub crates_tool: CratesTool,
     pub orchestrator: OrchestratorService,
 }

@@ -61,6 +61,12 @@ impl SynthesizerService {
         - If evidence is limited, say that clearly.
         - Do not invent scores or rankings.
         - Do not mention repositories unless they are present in the tool results.
+        - Do not mention crates unless they are present in the tool results.
+        - If crates_search results are present, recommend crates by role or use case.
+        - If the user asked for crates or libraries, the answer should primarily recommend crates from crates_search results.
+        - If the user asked for libraries/crates, do not switch to frameworks, runtimes, or databases unless the tool results explicitly support that and the user asked for them.
+        - Keep stable conceptual guidance separate from concrete crate suggestions.
+        - When recommending crates, prefer grouping them by role such as config, secrets, tracing, metrics, logging, orm, or database access.
         - Keep the answer compact and practical.
         - Prefer 4 short paragraphs or fewer.
         - Avoid repeating the user question or restating the tool names.
@@ -111,6 +117,11 @@ fn compact_tool_results(execution: &ExecutionResponse) -> Value {
                 "tool": result.tool_name,
                 "status": "ok",
                 "repos": extract_github_items(result.payload.as_ref()),
+            }),
+            ("crates_search", true) => json!({
+                "tool": result.tool_name,
+                "status": "ok",
+                "crates": extract_crates_items(result.payload.as_ref()),
             }),
             _ => json!({
                 "tool": result.tool_name,
@@ -175,6 +186,25 @@ fn extract_github_items(payload: Option<&Value>) -> Vec<Value> {
                 "language": item.get("language"),
                 "stargazers_count": item.get("stargazers_count"),
                 "updated_at": item.get("updated_at"),
+            })
+        })
+        .collect()
+}
+
+fn extract_crates_items(payload: Option<&Value>) -> Vec<Value> {
+    payload
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .take(5)
+        .map(|item| {
+            json!({
+                "name": item.get("name"),
+                "description": item.get("description"),
+                "downloads": item.get("downloads"),
+                "latest_version": item.get("latest_version"),
+                "categories": trim_array(item.get("categories"), 3),
+                "keywords": trim_array(item.get("keywords"), 4),
             })
         })
         .collect()

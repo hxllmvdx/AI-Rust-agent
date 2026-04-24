@@ -2,11 +2,11 @@ use crate::{
     agent::{
         orchestrator::OrchestratorService, planner::PlannerService, synthesizer::SynthesizerService,
     },
-    tools::{github::GitHubTool, local_data::LocalKnowledgeTool},
+    tools::{crates::CratesTool, github::GitHubTool, local_data::LocalKnowledgeTool},
 };
 use api::{
-    chat, debug_execute, debug_github_search, debug_llm, debug_local_search, debug_plan, health,
-    sessions,
+    chat, debug_crates_search, debug_execute, debug_github_search, debug_llm, debug_local_search,
+    debug_plan, health, sessions,
 };
 use axum::{
     Router,
@@ -66,12 +66,18 @@ async fn main() -> anyhow::Result<()> {
     let local_tool = LocalKnowledgeTool::load_from_file("/app/data/rust_tools.json")?;
 
     let github_tool = GitHubTool::new(config.github_token.clone());
+    let crates_tool = CratesTool::new(
+        config.crates_api_base_url.clone(),
+        config.crates_api_user_agent.clone(),
+        std::time::Duration::from_millis(config.crates_api_rate_limit_ms),
+    );
 
     let orchestrator = OrchestratorService::new(
         planner.clone(),
         synthesizer.clone(),
         local_tool.clone(),
         github_tool.clone(),
+        crates_tool.clone(),
         session_store.clone(),
     );
 
@@ -83,6 +89,7 @@ async fn main() -> anyhow::Result<()> {
         planner: planner,
         local_tool: local_tool,
         github_tool: github_tool,
+        crates_tool: crates_tool,
         orchestrator: orchestrator,
     };
 
@@ -100,6 +107,10 @@ async fn main() -> anyhow::Result<()> {
         .route(
             "/debug/github-search",
             post(debug_github_search::debug_github_search_handler),
+        )
+        .route(
+            "/debug/crates-search",
+            post(debug_crates_search::debug_crates_search_handler),
         )
         .route("/debug/execute", post(debug_execute::debug_execute_handler))
         .route("/chat", post(chat::chat_handler))
