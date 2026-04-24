@@ -48,5 +48,14 @@ services:
         ports:
             - "8080:8080"
 
+    frontend:
+        build: ./frontend
+        depends_on:
+            - backend
+        environment:
+            BACKEND_URL: http://backend:8080
+        ports:
+            - "8501:8501"
+
 volumes:
     ollama_data:
