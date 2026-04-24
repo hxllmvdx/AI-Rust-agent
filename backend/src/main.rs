@@ -1,5 +1,8 @@
-use crate::{agent::planner::PlannerService, tools::local_data::LocalKnowledgeTool};
-use api::{debug_llm, debug_local_search, debug_plan, health, sessions};
+use crate::{
+    agent::planner::PlannerService,
+    tools::{github::GitHubTool, local_data::LocalKnowledgeTool},
+};
+use api::{debug_github_search, debug_llm, debug_local_search, debug_plan, health, sessions};
 use axum::{
     Router,
     routing::{get, post},
@@ -39,12 +42,15 @@ async fn main() -> anyhow::Result<()> {
 
     let local_tool = LocalKnowledgeTool::load_from_file("/app/data/rust_tools.json")?;
 
+    let github_tool = GitHubTool::new(config.github_token.clone());
+
     let state = AppState {
         app_name: "ai-rust-agent".to_string(),
         sessions: session_store,
         llm: llm,
         planner: planner,
         local_tool: local_tool,
+        github_tool: github_tool,
     };
 
     let app = Router::new()
@@ -60,6 +66,10 @@ async fn main() -> anyhow::Result<()> {
         .route(
             "/debug/local-search",
             post(debug_local_search::debug_local_search_handler),
+        )
+        .route(
+            "/debug/github-search",
+            post(debug_github_search::debug_github_search_handler),
         )
         .layer(TraceLayer::new_for_http())
         .with_state(state);

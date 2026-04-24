@@ -44,6 +44,7 @@ services:
             OLLAMA_BASE_URL: http://ollama:11434
             OLLAMA_MODEL: qwen3:8b
             RUST_LOG: debug,tower_http=debug
+            GITHUB_TOKEN: ${GITHUB_TOKEN}
         ports:
             - "8080:8080"
 

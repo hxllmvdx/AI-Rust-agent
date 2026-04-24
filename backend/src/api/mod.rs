@@ -1,3 +1,4 @@
+pub mod debug_github_search;
 pub mod debug_llm;
 pub mod debug_local_search;
 pub mod debug_plan;
