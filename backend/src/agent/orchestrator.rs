@@ -41,16 +41,22 @@ impl OrchestratorService {
     }
 
     pub async fn execute(&self, user_message: &str) -> Result<ExecutionResponse, BackendError> {
+        let planner_started = std::time::Instant::now();
         let raw_plan = self.planner.plan(user_message).await?;
         tracing::info!("raw planner output: {:?}", raw_plan);
+        tracing::info!("planner took {:?}", planner_started.elapsed());
 
+        let policy_started = std::time::Instant::now();
         let plan = policy::apply_tool_policy(user_message, raw_plan);
         tracing::info!("filtered planner output: {:?}", plan);
+        tracing::info!("policy filtering took {:?}", policy_started.elapsed());
 
         let mut tool_results = Vec::new();
 
         for tool_call in &plan.tools {
+            let tool_started = std::time::Instant::now();
             let result = self.execute_tool(tool_call).await?;
+            tracing::info!("tool {} took {:?}", tool_call.name, tool_started.elapsed());
             tool_results.push(result);
         }
 
@@ -65,6 +71,8 @@ impl OrchestratorService {
         session_id: uuid::Uuid,
         user_message: &str,
     ) -> Result<(String, Vec<String>), BackendError> {
+        let chat_started = std::time::Instant::now();
+
         self.sessions
             .update_session(
                 session_id,
@@ -99,10 +107,12 @@ impl OrchestratorService {
                 .await?;
         }
 
+        let synth_started = std::time::Instant::now();
         let answer = self
             .synthesizer
             .synthesize(user_message, &execution)
             .await?;
+        tracing::info!("synthesizer took {:?}", synth_started.elapsed());
 
         self.sessions
             .update_session(
@@ -120,6 +130,8 @@ impl OrchestratorService {
             .iter()
             .map(|tool| tool.name.clone())
             .collect();
+
+        tracing::info!("handle_chat took {:?}", chat_started.elapsed());
 
         Ok((answer, used_tools))
     }

@@ -20,27 +20,50 @@ impl SynthesizerService {
         user_message: &str,
         execution: &ExecutionResponse,
     ) -> Result<String, BackendError> {
-        let used_tools = execution
-            .plan
-            .tools
-            .iter()
-            .map(|t| format!("- {}({})", t.name, t.arguments.query))
-            .collect::<Vec<_>>()
-            .join("\n");
+        let used_tools = if execution.plan.tools.is_empty() {
+            "none".to_string()
+        } else {
+            execution
+                .plan
+                .tools
+                .iter()
+                .map(|t| format!("{}({})", t.name, t.arguments.query))
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
 
-        let tool_results = serde_json::to_string_pretty(&execution.results)?;
+        let tool_results_json = serde_json::to_string_pretty(&execution.results)?;
+
+        let user_content = format!(
+            "\
+        User question:
+        {user_message}
+
+        Used tools:
+        {used_tools}
+
+        Tool results:
+        {tool_results_json}
+
+        Instructions:
+        - Use only the information present in the tool results.
+        - If evidence is limited, say that clearly.
+        - Do not invent scores or rankings.
+        - Do not mention repositories unless they are present in the tool results.
+
+        "
+        );
 
         let messages = vec![
             OllamaMessage {
                 role: "system".to_string(),
+
                 content: synthesizer_system_prompt(),
             },
             OllamaMessage {
                 role: "user".to_string(),
-                content: format!(
-                    "User question:\n{}\nUsed Tools:\n{}\nTool Results Json:\n{}",
-                    user_message, used_tools, tool_results
-                ),
+
+                content: user_content,
             },
         ];
 
