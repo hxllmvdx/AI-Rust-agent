@@ -1,3 +1,5 @@
+- Track: A + C
+
 # Rust AI Agent
 
 An agentic assistant for exploring the Rust backend ecosystem.
