@@ -1,10 +1,12 @@
 use crate::{
     agent::prompts::synthesizer_system_prompt,
     error::BackendError,
-    models::{execution::ExecutionResponse, ollama::OllamaMessage},
+    models::{execution::ExecutionResponse, ollama::OllamaMessage, sessions::ConversationMessage},
     services::llm::LlmService,
 };
 use serde_json::{Value, json};
+
+const SYNTHESIZER_HISTORY_LIMIT: usize = 6;
 
 #[derive(Clone)]
 pub struct SynthesizerService {
@@ -19,6 +21,7 @@ impl SynthesizerService {
     pub async fn synthesize(
         &self,
         user_message: &str,
+        history: &[ConversationMessage],
         execution: &ExecutionResponse,
     ) -> Result<String, BackendError> {
         let used_tools = if execution.plan.tools.is_empty() {
@@ -34,11 +37,16 @@ impl SynthesizerService {
         };
 
         let tool_results_json = serde_json::to_string(&compact_tool_results(execution))?;
+        let history_json = serde_json::to_string(&compact_history(history))?;
+        let has_successful_tool = execution.results.iter().any(|result| result.success);
 
         let user_content = format!(
             "\
         User question:
         {user_message}
+
+        Recent conversation:
+        {history_json}
 
         Used tools:
         {used_tools}
@@ -48,15 +56,30 @@ impl SynthesizerService {
 
         Instructions:
         - Use only the information present in the tool results.
+        - Some tools may have failed. If so, explicitly present a partial answer based on the successful tools.
+        - Never claim a failed tool returned no data; say the tool failed or was unavailable.
         - If evidence is limited, say that clearly.
         - Do not invent scores or rankings.
         - Do not mention repositories unless they are present in the tool results.
+        - Do not mention crates unless they are present in the tool results.
+        - If crates_search results are present, recommend crates by role or use case.
+        - If the user asked for crates or libraries, the answer should primarily recommend crates from crates_search results.
+        - If the user asked for libraries/crates, do not switch to frameworks, runtimes, or databases unless the tool results explicitly support that and the user asked for them.
+        - Keep stable conceptual guidance separate from concrete crate suggestions.
+        - When recommending crates, prefer grouping them by role such as config, secrets, tracing, metrics, logging, orm, or database access.
         - Keep the answer compact and practical.
         - Prefer 4 short paragraphs or fewer.
         - Avoid repeating the user question or restating the tool names.
 
         "
         );
+
+        if !has_successful_tool {
+            return Ok(
+                "I couldn't complete the full lookup because the requested tools failed. Please try again in a moment."
+                    .to_string(),
+            );
+        }
 
         let messages = vec![
             OllamaMessage {
@@ -79,17 +102,30 @@ fn compact_tool_results(execution: &ExecutionResponse) -> Value {
     let results = execution
         .results
         .iter()
-        .map(|result| match result.tool_name.as_str() {
-            "local_knowledge_search" => json!({
+        .map(|result| match (result.tool_name.as_str(), result.success) {
+            (_, false) => json!({
                 "tool": result.tool_name,
-                "items": extract_local_items(&result.payload),
+                "status": "failed",
+                "error": result.error,
             }),
-            "github_search" => json!({
+            ("local_knowledge_search", true) => json!({
                 "tool": result.tool_name,
-                "repos": extract_github_items(&result.payload),
+                "status": "ok",
+                "items": extract_local_items(result.payload.as_ref()),
+            }),
+            ("github_search", true) => json!({
+                "tool": result.tool_name,
+                "status": "ok",
+                "repos": extract_github_items(result.payload.as_ref()),
+            }),
+            ("crates_search", true) => json!({
+                "tool": result.tool_name,
+                "status": "ok",
+                "crates": extract_crates_items(result.payload.as_ref()),
             }),
             _ => json!({
                 "tool": result.tool_name,
+                "status": "ok",
                 "payload": result.payload,
             }),
         })
@@ -98,9 +134,30 @@ fn compact_tool_results(execution: &ExecutionResponse) -> Value {
     json!({ "results": results })
 }
 
-fn extract_local_items(payload: &Value) -> Vec<Value> {
+fn compact_history(history: &[ConversationMessage]) -> Value {
+    let messages = history
+        .iter()
+        .filter(|message| message.role == "user" || message.role == "assistant")
+        .rev()
+        .take(SYNTHESIZER_HISTORY_LIMIT)
+        .cloned()
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .map(|message| {
+            json!({
+                "role": message.role,
+                "content": truncate_message(&message.content, 300),
+            })
+        })
+        .collect::<Vec<_>>();
+
+    json!(messages)
+}
+
+fn extract_local_items(payload: Option<&Value>) -> Vec<Value> {
     payload
-        .as_array()
+        .and_then(Value::as_array)
         .into_iter()
         .flatten()
         .take(4)
@@ -116,9 +173,9 @@ fn extract_local_items(payload: &Value) -> Vec<Value> {
         .collect()
 }
 
-fn extract_github_items(payload: &Value) -> Vec<Value> {
+fn extract_github_items(payload: Option<&Value>) -> Vec<Value> {
     payload
-        .as_array()
+        .and_then(Value::as_array)
         .into_iter()
         .flatten()
         .take(4)
@@ -134,6 +191,25 @@ fn extract_github_items(payload: &Value) -> Vec<Value> {
         .collect()
 }
 
+fn extract_crates_items(payload: Option<&Value>) -> Vec<Value> {
+    payload
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .take(5)
+        .map(|item| {
+            json!({
+                "name": item.get("name"),
+                "description": item.get("description"),
+                "downloads": item.get("downloads"),
+                "latest_version": item.get("latest_version"),
+                "categories": trim_array(item.get("categories"), 3),
+                "keywords": trim_array(item.get("keywords"), 4),
+            })
+        })
+        .collect()
+}
+
 fn trim_array(value: Option<&Value>, limit: usize) -> Vec<Value> {
     value
         .and_then(Value::as_array)
@@ -142,4 +218,15 @@ fn trim_array(value: Option<&Value>, limit: usize) -> Vec<Value> {
         .take(limit)
         .cloned()
         .collect()
+}
+
+fn truncate_message(value: &str, limit: usize) -> String {
+    let mut chars = value.chars();
+    let truncated = chars.by_ref().take(limit).collect::<String>();
+
+    if chars.next().is_some() {
+        format!("{truncated}...")
+    } else {
+        truncated
+    }
 }

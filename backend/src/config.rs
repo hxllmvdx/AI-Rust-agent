@@ -26,11 +26,32 @@ fn default_ollama_keep_alive() -> String {
 }
 
 fn default_ollama_planner_model() -> String {
-    "qwen3:4b".to_string()
+    "qwen3:8b".to_string()
 }
 
 fn default_ollama_synthesizer_model() -> String {
     "qwen3:8b".to_string()
+}
+
+fn default_ollama_planner_thinking() -> bool {
+    false
+}
+
+fn default_ollama_synthesizer_thinking() -> bool {
+    true
+}
+
+fn default_crates_api_base_url() -> String {
+    "https://crates.io/api/v1".to_string()
+}
+
+fn default_crates_api_user_agent() -> String {
+    "ai-rust-agent (local development; set CRATES_API_USER_AGENT for production contact)"
+        .to_string()
+}
+
+fn default_crates_api_rate_limit_ms() -> u64 {
+    1000
 }
 
 #[derive(Deserialize, Debug)]
@@ -58,6 +79,21 @@ pub struct Config {
 
     #[serde(default = "default_ollama_keep_alive")]
     pub ollama_keep_alive: String,
+
+    #[serde(default = "default_ollama_planner_thinking")]
+    pub ollama_planner_thinking: bool,
+
+    #[serde(default = "default_ollama_synthesizer_thinking")]
+    pub ollama_synthesizer_thinking: bool,
+
+    #[serde(default = "default_crates_api_base_url")]
+    pub crates_api_base_url: String,
+
+    #[serde(default = "default_crates_api_user_agent")]
+    pub crates_api_user_agent: String,
+
+    #[serde(default = "default_crates_api_rate_limit_ms")]
+    pub crates_api_rate_limit_ms: u64,
 
     pub github_token: Option<String>,
 }

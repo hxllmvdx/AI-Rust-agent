@@ -1,4 +1,5 @@
 pub mod chat;
+pub mod debug_crates_search;
 pub mod debug_execute;
 pub mod debug_github_search;
 pub mod debug_llm;
