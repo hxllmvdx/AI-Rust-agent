@@ -1,4 +1,4 @@
-use crate::agent::planner::PlannerService;
+use crate::agent::{orchestrator::OrchestratorService, planner::PlannerService};
 use crate::services::llm::LlmService;
 use crate::services::session_store::SessionStore;
 use crate::tools::{github::GitHubTool, local_data::LocalKnowledgeTool};
@@ -11,4 +11,5 @@ pub struct AppState {
     pub planner: PlannerService,
     pub local_tool: LocalKnowledgeTool,
     pub github_tool: GitHubTool,
+    pub orchestrator: OrchestratorService,
 }

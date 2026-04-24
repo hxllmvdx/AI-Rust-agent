@@ -1,8 +1,10 @@
 use crate::{
-    agent::planner::PlannerService,
+    agent::{orchestrator::OrchestratorService, planner::PlannerService},
     tools::{github::GitHubTool, local_data::LocalKnowledgeTool},
 };
-use api::{debug_github_search, debug_llm, debug_local_search, debug_plan, health, sessions};
+use api::{
+    debug_execute, debug_github_search, debug_llm, debug_local_search, debug_plan, health, sessions,
+};
 use axum::{
     Router,
     routing::{get, post},
@@ -44,6 +46,9 @@ async fn main() -> anyhow::Result<()> {
 
     let github_tool = GitHubTool::new(config.github_token.clone());
 
+    let orchestrator =
+        OrchestratorService::new(planner.clone(), local_tool.clone(), github_tool.clone());
+
     let state = AppState {
         app_name: "ai-rust-agent".to_string(),
         sessions: session_store,
@@ -51,6 +56,7 @@ async fn main() -> anyhow::Result<()> {
         planner: planner,
         local_tool: local_tool,
         github_tool: github_tool,
+        orchestrator: orchestrator,
     };
 
     let app = Router::new()
@@ -71,6 +77,7 @@ async fn main() -> anyhow::Result<()> {
             "/debug/github-search",
             post(debug_github_search::debug_github_search_handler),
         )
+        .route("/debug/execute", post(debug_execute::debug_execute_handler))
         .layer(TraceLayer::new_for_http())
         .with_state(state);
 
