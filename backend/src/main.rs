@@ -46,16 +46,19 @@ async fn main() -> anyhow::Result<()> {
         config.ollama_url.clone(),
         config.ollama_synthesizer_model.clone(),
         config.ollama_keep_alive.clone(),
+        Some(config.ollama_synthesizer_thinking),
     );
     let planner_llm = LlmService::new(
         config.ollama_url.clone(),
         config.ollama_planner_model.clone(),
         config.ollama_keep_alive.clone(),
+        Some(config.ollama_planner_thinking),
     );
     let synthesizer_llm = LlmService::new(
         config.ollama_url.clone(),
         config.ollama_synthesizer_model.clone(),
         config.ollama_keep_alive.clone(),
+        Some(config.ollama_synthesizer_thinking),
     );
     let planner = PlannerService::new(planner_llm);
     let synthesizer = SynthesizerService::new(synthesizer_llm);

@@ -12,15 +12,17 @@ pub struct LlmService {
     base_url: String,
     model: String,
     keep_alive: String,
+    think: Option<bool>,
 }
 
 impl LlmService {
-    pub fn new(base_url: String, model: String, keep_alive: String) -> Self {
+    pub fn new(base_url: String, model: String, keep_alive: String, think: Option<bool>) -> Self {
         Self {
             http: Client::new(),
             base_url,
             model,
             keep_alive,
+            think,
         }
     }
 
@@ -30,6 +32,7 @@ impl LlmService {
             messages,
             stream: false,
             keep_alive: self.keep_alive.clone(),
+            think: self.think,
             format: None,
         };
 
@@ -57,6 +60,7 @@ impl LlmService {
             messages,
             stream: false,
             keep_alive: self.keep_alive.clone(),
+            think: self.think,
             format: Some(schema),
         };
 

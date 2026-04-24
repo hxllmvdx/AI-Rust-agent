@@ -1,10 +1,12 @@
 use crate::{
     agent::prompts::synthesizer_system_prompt,
     error::BackendError,
-    models::{execution::ExecutionResponse, ollama::OllamaMessage},
+    models::{execution::ExecutionResponse, ollama::OllamaMessage, sessions::ConversationMessage},
     services::llm::LlmService,
 };
 use serde_json::{Value, json};
+
+const SYNTHESIZER_HISTORY_LIMIT: usize = 6;
 
 #[derive(Clone)]
 pub struct SynthesizerService {
@@ -19,6 +21,7 @@ impl SynthesizerService {
     pub async fn synthesize(
         &self,
         user_message: &str,
+        history: &[ConversationMessage],
         execution: &ExecutionResponse,
     ) -> Result<String, BackendError> {
         let used_tools = if execution.plan.tools.is_empty() {
@@ -34,12 +37,16 @@ impl SynthesizerService {
         };
 
         let tool_results_json = serde_json::to_string(&compact_tool_results(execution))?;
+        let history_json = serde_json::to_string(&compact_history(history))?;
         let has_successful_tool = execution.results.iter().any(|result| result.success);
 
         let user_content = format!(
             "\
         User question:
         {user_message}
+
+        Recent conversation:
+        {history_json}
 
         Used tools:
         {used_tools}
@@ -116,6 +123,27 @@ fn compact_tool_results(execution: &ExecutionResponse) -> Value {
     json!({ "results": results })
 }
 
+fn compact_history(history: &[ConversationMessage]) -> Value {
+    let messages = history
+        .iter()
+        .filter(|message| message.role == "user" || message.role == "assistant")
+        .rev()
+        .take(SYNTHESIZER_HISTORY_LIMIT)
+        .cloned()
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .map(|message| {
+            json!({
+                "role": message.role,
+                "content": truncate_message(&message.content, 300),
+            })
+        })
+        .collect::<Vec<_>>();
+
+    json!(messages)
+}
+
 fn extract_local_items(payload: Option<&Value>) -> Vec<Value> {
     payload
         .and_then(Value::as_array)
@@ -160,4 +188,15 @@ fn trim_array(value: Option<&Value>, limit: usize) -> Vec<Value> {
         .take(limit)
         .cloned()
         .collect()
+}
+
+fn truncate_message(value: &str, limit: usize) -> String {
+    let mut chars = value.chars();
+    let truncated = chars.by_ref().take(limit).collect::<String>();
+
+    if chars.next().is_some() {
+        format!("{truncated}...")
+    } else {
+        truncated
+    }
 }

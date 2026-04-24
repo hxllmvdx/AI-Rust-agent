@@ -98,6 +98,7 @@ impl OrchestratorService {
         }
 
         let execution = self.execute(user_message).await?;
+        let session = self.sessions.get_session(session_id).await?;
 
         if !execution.plan.tools.is_empty() {
             self.sessions
@@ -115,7 +116,7 @@ impl OrchestratorService {
         let synth_started = std::time::Instant::now();
         let answer = self
             .synthesizer
-            .synthesize(user_message, &execution)
+            .synthesize(user_message, &session.messages, &execution)
             .await?;
         tracing::info!("synthesizer took {:?}", synth_started.elapsed());
 

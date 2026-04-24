@@ -1,6 +1,6 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
-use crate::models::tool::{ToolArguments, ToolCall, ToolPlan};
+use crate::models::tool::ToolPlan;
 
 pub fn fast_path_plan(user_message: &str) -> Option<ToolPlan> {
     let normalized = normalize(user_message);
@@ -17,19 +17,24 @@ pub fn fast_path_plan(user_message: &str) -> Option<ToolPlan> {
 
 pub fn fast_path_response(user_message: &str) -> Option<String> {
     let normalized = normalize(user_message);
+    let tokenized = tokenize(&normalized);
 
-    if contains_any(&normalized, &["hello", "hi", "hey", "say hello"]) {
+    if is_pure_greeting(&tokenized) || contains_phrase(&normalized, "say hello") {
         return Some("Hello! Ask me about Rust backend tools, repos, or trade-offs.".to_string());
     }
 
-    if contains_any(&normalized, &["how are you"]) {
+    if contains_phrase(&normalized, "how are you")
+        && !contains_technical_intent(&tokenized, &normalized)
+    {
         return Some(
             "I'm ready to help. Ask me to compare Rust backend tools or find active repositories."
                 .to_string(),
         );
     }
 
-    if contains_any(&normalized, &["tell me a joke"]) {
+    if contains_phrase(&normalized, "tell me a joke")
+        && !contains_technical_intent(&tokenized, &normalized)
+    {
         return Some(
             "Rust joke: fearless concurrency is great until your TODO list starts racing too."
                 .to_string(),
@@ -49,7 +54,6 @@ pub fn apply_tool_policy(user_message: &str, mut plan: ToolPlan) -> ToolPlan {
     }
 
     retain_supported_tools(&mut plan);
-    apply_intent_routing(user_message, &normalized, &mut plan);
     rewrite_tool_queries(user_message, &mut plan);
     debug_tools(&mut plan);
 
@@ -62,130 +66,117 @@ fn normalize(input: &str) -> String {
 }
 
 fn is_smalltalk(message: &str) -> bool {
-    let smalltalk_patterns = [
-        "say hello",
-        "hello",
-        "hi",
-        "hey",
-        "how are you",
-        "tell me a joke",
+    let normalized = normalize(message);
+    let tokenized = tokenize(&normalized);
+
+    if contains_technical_intent(&tokenized, &normalized) {
+        return false;
+    }
+
+    let token_count = tokenized.len();
+    let has_smalltalk_phrase = contains_phrase(&normalized, "say hello")
+        || contains_phrase(&normalized, "how are you")
+        || contains_phrase(&normalized, "tell me a joke");
+    let all_tokens_smalltalk = token_count > 0
+        && tokenized.iter().all(|token| {
+            matches!(
+                token.as_str(),
+                "hello"
+                    | "hi"
+                    | "hey"
+                    | "how"
+                    | "are"
+                    | "you"
+                    | "tell"
+                    | "me"
+                    | "a"
+                    | "joke"
+                    | "say"
+            )
+        });
+
+    (has_smalltalk_phrase && token_count <= 8)
+        || (all_tokens_smalltalk && token_count <= 4)
+        || (token_count == 1
+            && tokenized
+                .iter()
+                .any(|token| matches!(token.as_str(), "hello" | "hi" | "hey")))
+}
+
+fn contains_phrase(message: &str, phrase: &str) -> bool {
+    message.contains(phrase)
+}
+
+fn tokenize(message: &str) -> Vec<String> {
+    message
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|token| !token.is_empty())
+        .map(|token| token.to_string())
+        .collect()
+}
+
+fn contains_technical_intent(tokens: &[String], normalized: &str) -> bool {
+    let technical_tokens = [
+        "rust",
+        "backend",
+        "framework",
+        "frameworks",
+        "database",
+        "databases",
+        "routing",
+        "router",
+        "api",
+        "web",
+        "server",
+        "service",
+        "services",
+        "tool",
+        "tools",
+        "repo",
+        "repos",
+        "repository",
+        "repositories",
+        "github",
+        "sql",
+        "orm",
+        "postgres",
+        "mysql",
+        "sqlite",
+        "actix",
+        "axum",
+        "warp",
+        "rocket",
+        "tokio",
+        "observability",
+        "tracing",
+        "auth",
+        "authentication",
+        "recommend",
+        "advice",
+        "find",
+        "learn",
+        "code",
+        "concurrent",
+        "fast",
     ];
 
-    smalltalk_patterns
+    tokens
         .iter()
-        .any(|pattern| message.contains(pattern))
+        .any(|token| technical_tokens.contains(&token.as_str()))
+        || contains_phrase(normalized, "high load")
+        || contains_phrase(normalized, "high-load")
+        || contains_phrase(normalized, "write backend code")
+        || contains_phrase(normalized, "find me")
+        || contains_phrase(normalized, "recommend me")
 }
 
-fn contains_any(message: &str, patterns: &[&str]) -> bool {
-    patterns.iter().any(|pattern| message.contains(pattern))
-}
-
-fn apply_intent_routing(user_message: &str, normalized: &str, plan: &mut ToolPlan) {
-    if is_compare_only_request(normalized) {
-        plan.tools.retain(|tool| tool.name != "github_search");
-        ensure_tool(plan, "local_knowledge_search", user_message);
-        return;
-    }
-
-    if should_use_both_sources(normalized) {
-        ensure_tool(plan, "local_knowledge_search", user_message);
-        ensure_tool(plan, "github_search", user_message);
-    }
-}
-
-fn is_compare_only_request(message: &str) -> bool {
-    is_comparison_request(message) && !has_discovery_intent(message)
-}
-
-fn should_use_both_sources(message: &str) -> bool {
-    has_discovery_intent(message) && is_framework_selection_request(message)
-}
-
-fn is_comparison_request(message: &str) -> bool {
-    contains_any(
-        message,
-        &[
-            "compare",
-            "comparison",
-            "vs",
-            "versus",
-            "trade-off",
-            "tradeoffs",
-            "tradeoff",
-            "pros and cons",
-            "pros/cons",
-            "difference between",
-        ],
-    )
-}
-
-fn has_discovery_intent(message: &str) -> bool {
-    contains_any(
-        message,
-        &[
-            "find",
-            "find me",
-            "show",
-            "list",
-            "search",
-            "looking for",
-            "look for",
-            "pick",
-            "choose",
-            "recommend",
-            "suggest",
-            "some repos",
-            "repositories",
-            "repository",
-            "repo",
-            "repos",
-            "current",
-            "latest",
-            "active",
-            "recent",
-        ],
-    )
-}
-
-fn is_framework_selection_request(message: &str) -> bool {
-    contains_any(
-        message,
-        &[
-            "backend",
-            "framework",
-            "frameworks",
-            "tooling",
-            "stack",
-            "project",
-            "new project",
-            "service",
-            "api",
-            "library",
-            "libraries",
-            "ecosystem",
-            "web",
-        ],
-    )
-}
-
-fn ensure_tool(plan: &mut ToolPlan, name: &str, query: &str) {
-    if plan.tools.iter().any(|tool| tool.name == name) {
-        return;
-    }
-
-    plan.tools.push(tool_call(name, query));
-}
-
-fn tool_call(name: &str, query: &str) -> ToolCall {
-    let query = match name {
-        "github_search" => build_github_query(query),
-        _ => query.to_string(),
-    };
-
-    ToolCall {
-        name: name.to_string(),
-        arguments: ToolArguments { query },
-    }
+fn is_pure_greeting(tokens: &[String]) -> bool {
+    let token_count = tokens.len();
+    token_count > 0
+        && token_count <= 3
+        && tokens
+            .iter()
+            .all(|token| matches!(token.as_str(), "hello" | "hi" | "hey"))
 }
 
 fn rewrite_tool_queries(user_message: &str, plan: &mut ToolPlan) {
@@ -228,6 +219,7 @@ fn preferred_github_terms(input: &str) -> Vec<String> {
     let normalized = normalize(input);
     let ordered_terms = [
         "rust",
+        "sql",
         "backend",
         "framework",
         "frameworks",
@@ -250,8 +242,15 @@ fn preferred_github_terms(input: &str) -> Vec<String> {
         "auth",
         "database",
         "orm",
+        "sqlx",
+        "diesel",
+        "seaorm",
+        "sea-orm",
         "postgres",
         "redis",
+        "mysql",
+        "sqlite",
+        "postgresql",
         "graphql",
         "grpc",
         "tooling",
@@ -345,10 +344,43 @@ fn generic_github_terms(input: &str) -> Vec<String> {
 }
 
 fn debug_tools(plan: &mut ToolPlan) {
-    let mut seen = HashSet::new();
-
+    let mut seen_exact = HashSet::new();
     plan.tools.retain(|tool| {
         let key = format!("{}::{}", tool.name, tool.arguments.query);
-        seen.insert(key)
+        seen_exact.insert(key)
     });
+
+    let mut best_by_tool: HashMap<String, usize> = HashMap::new();
+    for (index, tool) in plan.tools.iter().enumerate() {
+        best_by_tool
+            .entry(tool.name.clone())
+            .and_modify(|best_index| {
+                if is_better_query(
+                    &tool.arguments.query,
+                    &plan.tools[*best_index].arguments.query,
+                ) {
+                    *best_index = index;
+                }
+            })
+            .or_insert(index);
+    }
+
+    plan.tools = plan
+        .tools
+        .iter()
+        .enumerate()
+        .filter(|(index, tool)| best_by_tool.get(&tool.name) == Some(index))
+        .map(|(_, tool)| tool.clone())
+        .collect();
+}
+
+fn is_better_query(candidate: &str, current: &str) -> bool {
+    let candidate_tokens = tokenize(&normalize(candidate));
+    let current_tokens = tokenize(&normalize(current));
+
+    if candidate_tokens.len() != current_tokens.len() {
+        return candidate_tokens.len() > current_tokens.len();
+    }
+
+    candidate.len() > current.len()
 }

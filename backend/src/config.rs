@@ -26,11 +26,19 @@ fn default_ollama_keep_alive() -> String {
 }
 
 fn default_ollama_planner_model() -> String {
-    "qwen3:4b".to_string()
+    "qwen3:8b".to_string()
 }
 
 fn default_ollama_synthesizer_model() -> String {
     "qwen3:8b".to_string()
+}
+
+fn default_ollama_planner_thinking() -> bool {
+    false
+}
+
+fn default_ollama_synthesizer_thinking() -> bool {
+    true
 }
 
 #[derive(Deserialize, Debug)]
@@ -58,6 +66,12 @@ pub struct Config {
 
     #[serde(default = "default_ollama_keep_alive")]
     pub ollama_keep_alive: String,
+
+    #[serde(default = "default_ollama_planner_thinking")]
+    pub ollama_planner_thinking: bool,
+
+    #[serde(default = "default_ollama_synthesizer_thinking")]
+    pub ollama_synthesizer_thinking: bool,
 
     pub github_token: Option<String>,
 }
