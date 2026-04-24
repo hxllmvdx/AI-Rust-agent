@@ -71,6 +71,28 @@ impl OrchestratorService {
 
         let execution = self.execute(user_message).await?;
 
+        if !execution.plan.tools.is_empty() {
+            self.sessions
+                .update_session(
+                    session_id,
+                    ConversationMessage {
+                        role: "tool".to_string(),
+
+                        content: format!(
+                            "Used tools: {}",
+                            execution
+                                .plan
+                                .tools
+                                .iter()
+                                .map(|t| format!("{}({})", t.name, t.arguments.query))
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        ),
+                    },
+                )
+                .await?;
+        }
+
         let answer = self
             .synthesizer
             .synthesize(user_message, &execution)

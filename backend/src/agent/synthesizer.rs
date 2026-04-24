@@ -20,7 +20,15 @@ impl SynthesizerService {
         user_message: &str,
         execution: &ExecutionResponse,
     ) -> Result<String, BackendError> {
-        let execution_json = serde_json::to_string_pretty(execution)?;
+        let used_tools = execution
+            .plan
+            .tools
+            .iter()
+            .map(|t| format!("- {}({})", t.name, t.arguments.query))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        let tool_results = serde_json::to_string_pretty(&execution.results)?;
 
         let messages = vec![
             OllamaMessage {
@@ -30,8 +38,8 @@ impl SynthesizerService {
             OllamaMessage {
                 role: "user".to_string(),
                 content: format!(
-                    "User question:\n{}\nTool execution results:\n{}",
-                    user_message, execution_json
+                    "User question:\n{}\nUsed Tools:\n{}\nTool Results Json:\n{}",
+                    user_message, used_tools, tool_results
                 ),
             },
         ];
