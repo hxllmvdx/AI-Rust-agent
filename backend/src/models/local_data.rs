@@ -15,11 +15,20 @@ pub struct KnowledgeItem {
     pub collected_at: String,
 }
 
+#[derive(Debug, Clone)]
+pub struct RankedKnowledgeResult {
+    pub id: String,
+    pub title: String,
+    pub score: u32,
+    pub summary: String,
+    pub pros: Vec<String>,
+    pub cons: Vec<String>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct KnowledgeSearchResult {
     pub id: String,
     pub title: String,
-    pub score: u32,
     pub summary: String,
     pub pros: Vec<String>,
     pub cons: Vec<String>,

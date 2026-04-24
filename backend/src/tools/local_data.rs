@@ -2,7 +2,7 @@ use std::fs;
 
 use crate::{
     error::BackendError,
-    models::local_data::{KnowledgeItem, KnowledgeSearchResult},
+    models::local_data::{KnowledgeItem, KnowledgeSearchResult, RankedKnowledgeResult},
 };
 
 #[derive(Clone)]
@@ -20,7 +20,7 @@ impl LocalKnowledgeTool {
     pub fn search(&self, query: &str, limit: usize) -> Vec<KnowledgeSearchResult> {
         let tokens = normalize_query(query);
 
-        let mut result: Vec<KnowledgeSearchResult> = self
+        let mut ranked: Vec<RankedKnowledgeResult> = self
             .items
             .iter()
             .filter_map(|item| {
@@ -30,7 +30,7 @@ impl LocalKnowledgeTool {
                     return None;
                 }
 
-                Some(KnowledgeSearchResult {
+                Some(RankedKnowledgeResult {
                     id: item.id.clone(),
                     title: item.title.clone(),
                     score,
@@ -41,9 +41,19 @@ impl LocalKnowledgeTool {
             })
             .collect();
 
-        result.sort_by(|a, b| b.score.cmp(&a.score));
-        result.truncate(limit);
-        result
+        ranked.sort_by(|a, b| b.score.cmp(&a.score));
+        ranked.truncate(limit);
+
+        ranked
+            .into_iter()
+            .map(|item| KnowledgeSearchResult {
+                id: item.id,
+                title: item.title,
+                summary: item.summary,
+                pros: item.pros,
+                cons: item.cons,
+            })
+            .collect()
     }
 }
 

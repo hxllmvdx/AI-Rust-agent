@@ -42,9 +42,23 @@ async fn main() -> anyhow::Result<()> {
     let redis_client = redis::Client::open(config.redis_url.clone())?;
     let session_store = SessionStore::new(redis_client, config.session_ttl);
 
-    let llm = LlmService::new(config.ollama_url.clone(), config.ollama_model.clone());
-    let planner = PlannerService::new(llm.clone());
-    let synthesizer = SynthesizerService::new(llm.clone());
+    let llm = LlmService::new(
+        config.ollama_url.clone(),
+        config.ollama_synthesizer_model.clone(),
+        config.ollama_keep_alive.clone(),
+    );
+    let planner_llm = LlmService::new(
+        config.ollama_url.clone(),
+        config.ollama_planner_model.clone(),
+        config.ollama_keep_alive.clone(),
+    );
+    let synthesizer_llm = LlmService::new(
+        config.ollama_url.clone(),
+        config.ollama_synthesizer_model.clone(),
+        config.ollama_keep_alive.clone(),
+    );
+    let planner = PlannerService::new(planner_llm);
+    let synthesizer = SynthesizerService::new(synthesizer_llm);
 
     let local_tool = LocalKnowledgeTool::load_from_file("/app/data/rust_tools.json")?;
 
