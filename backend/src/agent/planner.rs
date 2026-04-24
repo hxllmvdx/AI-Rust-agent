@@ -54,33 +54,8 @@ impl PlannerService {
             },
         ];
 
-        let mut plan: ToolPlan = self.llm.chat_json(messages, schema).await?;
-
-        if !should_allow_github(user_message) {
-            plan.tools.retain(|tool| tool.name != "github_search");
-            plan.need_tools = !plan.tools.is_empty();
-        }
+        let plan: ToolPlan = self.llm.chat_json(messages, schema).await?;
 
         Ok(plan)
     }
-}
-
-fn should_allow_github(user_message: &str) -> bool {
-    let msg = user_message.to_lowercase();
-
-    let keywords = [
-        "github",
-        "repo",
-        "repos",
-        "repository",
-        "repositories",
-        "active",
-        "current",
-        "latest",
-        "stars",
-        "updated",
-        "recent",
-    ];
-
-    keywords.iter().any(|k| msg.contains(k))
 }

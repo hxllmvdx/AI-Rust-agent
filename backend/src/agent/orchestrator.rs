@@ -1,6 +1,7 @@
 use serde_json::to_value;
 
 use crate::{
+    agent::policy,
     error::BackendError,
     models::{
         execution::{ExecutionResponse, ToolExecutionResult},
@@ -40,7 +41,12 @@ impl OrchestratorService {
     }
 
     pub async fn execute(&self, user_message: &str) -> Result<ExecutionResponse, BackendError> {
-        let plan = self.planner.plan(user_message).await?;
+        let raw_plan = self.planner.plan(user_message).await?;
+        tracing::info!("raw planner output: {:?}", raw_plan);
+
+        let plan = policy::apply_tool_policy(user_message, raw_plan);
+        tracing::info!("filtered planner output: {:?}", plan);
+
         let mut tool_results = Vec::new();
 
         for tool_call in &plan.tools {
