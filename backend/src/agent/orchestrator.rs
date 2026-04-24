@@ -4,30 +4,38 @@ use crate::{
     error::BackendError,
     models::{
         execution::{ExecutionResponse, ToolExecutionResult},
+        sessions::ConversationMessage,
         tool::ToolCall,
     },
+    services::session_store::SessionStore,
     tools::{github::GitHubTool, local_data::LocalKnowledgeTool},
 };
 
-use super::planner::PlannerService;
+use super::{planner::PlannerService, synthesizer::SynthesizerService};
 
 #[derive(Clone)]
 pub struct OrchestratorService {
     planner: PlannerService,
+    synthesizer: SynthesizerService,
     local_tool: LocalKnowledgeTool,
     github_tool: GitHubTool,
+    sessions: SessionStore,
 }
 
 impl OrchestratorService {
     pub fn new(
         planner: PlannerService,
+        synthesizer: SynthesizerService,
         local_tool: LocalKnowledgeTool,
         github_tool: GitHubTool,
+        sessions: SessionStore,
     ) -> Self {
         Self {
             planner,
+            synthesizer,
             local_tool,
             github_tool,
+            sessions,
         }
     }
 
@@ -44,6 +52,48 @@ impl OrchestratorService {
             plan,
             results: tool_results,
         })
+    }
+
+    pub async fn handle_chat(
+        &self,
+        session_id: uuid::Uuid,
+        user_message: &str,
+    ) -> Result<(String, Vec<String>), BackendError> {
+        self.sessions
+            .update_session(
+                session_id,
+                ConversationMessage {
+                    role: "user".to_string(),
+                    content: user_message.to_string(),
+                },
+            )
+            .await?;
+
+        let execution = self.execute(user_message).await?;
+
+        let answer = self
+            .synthesizer
+            .synthesize(user_message, &execution)
+            .await?;
+
+        self.sessions
+            .update_session(
+                session_id,
+                ConversationMessage {
+                    role: "assistant".to_string(),
+                    content: answer.clone(),
+                },
+            )
+            .await?;
+
+        let used_tools = execution
+            .plan
+            .tools
+            .iter()
+            .map(|tool| tool.name.clone())
+            .collect();
+
+        Ok((answer, used_tools))
     }
 
     async fn execute_tool(
