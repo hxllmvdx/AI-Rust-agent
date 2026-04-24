@@ -14,6 +14,9 @@ pub enum BackendError {
     #[error("session not found")]
     SessionNotFound,
 
+    #[error("io error: {0}")]
+    Io(#[from] std::io::Error),
+
     #[error("http client error: {0}")]
     ReqwestError(#[from] reqwest::Error),
 }

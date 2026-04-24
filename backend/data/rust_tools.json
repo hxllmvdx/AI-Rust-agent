@@ -1,0 +1,354 @@
+[
+    {
+        "id": "axum",
+        "title": "Axum",
+        "category": "web_framework",
+        "tags": [
+            "rust",
+            "web",
+            "backend",
+            "async",
+            "tokio",
+            "tower",
+            "hyper",
+            "rest"
+        ],
+        "summary": "HTTP routing and request-handling library focused on ergonomics and modularity, built in the Tokio ecosystem and commonly used with Tower and Hyper.",
+        "use_cases": [
+            "REST API",
+            "microservices",
+            "async backend",
+            "JSON APIs"
+        ],
+        "pros": [
+            "good fit for Tokio-based stacks",
+            "clean handler and extractor model",
+            "easy integration with Tower middleware",
+            "predictable architecture for service-oriented backends"
+        ],
+        "cons": [
+            "less batteries-included than more opinionated frameworks",
+            "some ecosystem pieces require understanding Tower concepts",
+            "can feel lower-level than full-stack frameworks"
+        ],
+        "related": [
+            "tokio",
+            "tower",
+            "hyper",
+            "serde",
+            "sqlx",
+            "reqwest",
+            "tracing"
+        ],
+        "source": "tokio-rs/axum docs and repository",
+        "collected_at": "2026-04-24"
+    },
+    {
+        "id": "actix-web",
+        "title": "Actix Web",
+        "category": "web_framework",
+        "tags": ["rust", "web", "backend", "async", "http", "rest", "tokio"],
+        "summary": "Powerful, pragmatic, and extremely fast web framework for Rust with strong routing, extractors, middleware, and HTTP/WebSocket support.",
+        "use_cases": [
+            "REST API",
+            "high-performance web services",
+            "web backends",
+            "WebSocket servers"
+        ],
+        "pros": [
+            "rich built-in web features",
+            "strong extractor system",
+            "good performance reputation",
+            "mature ecosystem for backend work"
+        ],
+        "cons": [
+            "framework style is more opinionated than lower-level libraries",
+            "some APIs may feel less minimal than Axum",
+            "less aligned with Tower-first ecosystem design"
+        ],
+        "related": ["tokio", "serde", "sqlx", "reqwest", "tracing"],
+        "source": "actix.rs docs and actix/actix-web repository",
+        "collected_at": "2026-04-24"
+    },
+    {
+        "id": "tokio",
+        "title": "Tokio",
+        "category": "async_runtime",
+        "tags": ["rust", "async", "runtime", "io", "networking", "scheduler"],
+        "summary": "Asynchronous runtime and platform for writing reliable Rust applications, providing async I/O, networking, scheduling, timers, and related building blocks.",
+        "use_cases": [
+            "async backend",
+            "network services",
+            "concurrent systems",
+            "protocol servers"
+        ],
+        "pros": [
+            "core foundation of modern async Rust backend development",
+            "large ecosystem and community adoption",
+            "good building blocks for networking applications",
+            "works well with Axum, Hyper, Tonic, Reqwest, and Tracing"
+        ],
+        "cons": [
+            "async Rust has a learning curve",
+            "runtime choices and task boundaries need discipline",
+            "debugging complex async flows can be harder than sync code"
+        ],
+        "related": ["axum", "hyper", "tower", "reqwest", "tracing", "tonic"],
+        "source": "tokio.rs and tokio-rs/tokio repository",
+        "collected_at": "2026-04-24"
+    },
+    {
+        "id": "tower",
+        "title": "Tower",
+        "category": "service_abstraction",
+        "tags": [
+            "rust",
+            "middleware",
+            "service",
+            "networking",
+            "backend",
+            "tokio"
+        ],
+        "summary": "Library of modular and reusable components for building robust clients and servers around the Service abstraction.",
+        "use_cases": [
+            "middleware composition",
+            "service pipelines",
+            "retries",
+            "timeouts",
+            "rate limiting"
+        ],
+        "pros": [
+            "excellent for composing backend concerns cleanly",
+            "fits naturally with Axum and Hyper stacks",
+            "encourages modular architecture",
+            "helps keep cross-cutting logic out of handlers"
+        ],
+        "cons": [
+            "Service abstraction takes time to internalize",
+            "can feel abstract for small projects",
+            "some middleware composition patterns are not beginner-friendly"
+        ],
+        "related": ["axum", "tokio", "hyper", "tonic", "tracing"],
+        "source": "Tower docs and Tokio ecosystem references",
+        "collected_at": "2026-04-24"
+    },
+    {
+        "id": "hyper",
+        "title": "Hyper",
+        "category": "http_library",
+        "tags": ["rust", "http", "client", "server", "low-level", "async"],
+        "summary": "HTTP library for Rust focused on correctness, robustness, and performance, commonly used as a low-level building block for clients and servers.",
+        "use_cases": [
+            "custom HTTP servers",
+            "custom HTTP clients",
+            "protocol infrastructure",
+            "backend foundations"
+        ],
+        "pros": [
+            "good low-level control",
+            "widely used foundation in Rust web stacks",
+            "strong fit for custom networking or protocol work",
+            "good choice when framework abstractions are too high-level"
+        ],
+        "cons": [
+            "lower-level than most application developers need",
+            "more boilerplate than Axum or Actix Web",
+            "less convenient for CRUD-style apps out of the box"
+        ],
+        "related": ["tokio", "axum", "tower", "reqwest", "tonic"],
+        "source": "hyper.rs guides and Hyper project site",
+        "collected_at": "2026-04-24"
+    },
+    {
+        "id": "reqwest",
+        "title": "Reqwest",
+        "category": "http_client",
+        "tags": ["rust", "http", "client", "async", "api", "rest"],
+        "summary": "Ergonomic, batteries-included HTTP client for Rust, commonly used for consuming external APIs from async applications.",
+        "use_cases": [
+            "external API calls",
+            "REST clients",
+            "webhooks",
+            "service-to-service calls"
+        ],
+        "pros": [
+            "easy to use for HTTP requests",
+            "good fit for agent tools and API integrations",
+            "typed JSON workflows are straightforward with Serde",
+            "works naturally in Tokio-based backends"
+        ],
+        "cons": [
+            "less control than lower-level HTTP libraries",
+            "TLS and feature choices matter in containerized environments",
+            "not the right tool if you need very low-level protocol handling"
+        ],
+        "related": ["serde", "tokio", "hyper", "axum", "tracing"],
+        "source": "Reqwest crate docs",
+        "collected_at": "2026-04-24"
+    },
+    {
+        "id": "sqlx",
+        "title": "SQLx",
+        "category": "database_toolkit",
+        "tags": [
+            "rust",
+            "database",
+            "sql",
+            "postgres",
+            "mysql",
+            "sqlite",
+            "async"
+        ],
+        "summary": "Async, pure Rust SQL toolkit with optional compile-time checked queries and support for PostgreSQL, MySQL, MariaDB, and SQLite without using a custom DSL.",
+        "use_cases": [
+            "PostgreSQL-backed services",
+            "typed SQL access",
+            "repository layer",
+            "async data access"
+        ],
+        "pros": [
+            "good choice when you want SQL instead of a heavy ORM abstraction",
+            "fits well with backend services and explicit query design",
+            "compile-time query checking is a strong feature",
+            "good interoperability with Axum and Tokio stacks"
+        ],
+        "cons": [
+            "more manual SQL than ORM-first approaches",
+            "schema evolution workflow needs discipline",
+            "compile-time checked mode adds setup complexity"
+        ],
+        "related": ["tokio", "serde", "axum", "actix-web", "seaorm"],
+        "source": "launchbadge/sqlx repository and README",
+        "collected_at": "2026-04-24"
+    },
+    {
+        "id": "tracing",
+        "title": "tracing",
+        "category": "observability",
+        "tags": [
+            "rust",
+            "logging",
+            "observability",
+            "diagnostics",
+            "instrumentation",
+            "async"
+        ],
+        "summary": "Framework for instrumenting Rust programs to collect structured, event-based diagnostic information, designed for application-level tracing.",
+        "use_cases": [
+            "request tracing",
+            "structured logs",
+            "latency diagnostics",
+            "distributed service debugging"
+        ],
+        "pros": [
+            "better fit than plain logging for async systems",
+            "structured events and spans are useful for backend observability",
+            "good integration across Tokio ecosystem libraries",
+            "valuable for debugging agent orchestration"
+        ],
+        "cons": [
+            "requires learning spans, events, and subscriber setup",
+            "needs consistent instrumentation to pay off",
+            "can add noise if log levels are not planned"
+        ],
+        "related": ["tokio", "axum", "tower", "reqwest", "tonic"],
+        "source": "tokio-rs/tracing repository",
+        "collected_at": "2026-04-24"
+    },
+    {
+        "id": "tonic",
+        "title": "Tonic",
+        "category": "grpc_library",
+        "tags": ["rust", "grpc", "rpc", "http2", "async", "backend"],
+        "summary": "Rust implementation of gRPC for building native client and server systems over HTTP/2, focused on interoperability and performance.",
+        "use_cases": [
+            "internal RPC",
+            "microservices",
+            "service meshes",
+            "typed backend interfaces"
+        ],
+        "pros": [
+            "strong choice for typed internal service communication",
+            "fits well with Tokio ecosystem",
+            "good when REST is not the best interface",
+            "pairs naturally with Protobuf-based contracts"
+        ],
+        "cons": [
+            "more setup and tooling than plain REST",
+            "not ideal for simple public APIs",
+            "introduces Protobuf and code generation workflow"
+        ],
+        "related": ["tokio", "hyper", "tower", "tracing", "serde"],
+        "source": "hyperium/tonic repository",
+        "collected_at": "2026-04-24"
+    },
+    {
+        "id": "serde",
+        "title": "Serde",
+        "category": "serialization",
+        "tags": [
+            "rust",
+            "serialization",
+            "deserialization",
+            "json",
+            "data",
+            "backend"
+        ],
+        "summary": "Framework for serializing and deserializing Rust data structures efficiently and generically across many data formats.",
+        "use_cases": [
+            "JSON APIs",
+            "config parsing",
+            "request/response models",
+            "data interchange"
+        ],
+        "pros": [
+            "essential part of most Rust backend stacks",
+            "excellent ergonomics for typed data models",
+            "works across JSON, config files, and other formats",
+            "reduces manual parsing boilerplate"
+        ],
+        "cons": [
+            "custom serialization cases can become verbose",
+            "derive-based models still need careful schema design",
+            "versioned API compatibility remains your responsibility"
+        ],
+        "related": ["axum", "actix-web", "reqwest", "sqlx", "seaorm"],
+        "source": "Serde official site",
+        "collected_at": "2026-04-24"
+    },
+    {
+        "id": "seaorm",
+        "title": "SeaORM",
+        "category": "orm",
+        "tags": [
+            "rust",
+            "orm",
+            "database",
+            "async",
+            "postgres",
+            "mysql",
+            "sqlite"
+        ],
+        "summary": "Async and dynamic ORM for Rust with batteries-included features such as filters, pagination, and nested queries for REST, GraphQL, and gRPC APIs.",
+        "use_cases": [
+            "ORM-based backend development",
+            "database CRUD",
+            "admin backends",
+            "rapid API development"
+        ],
+        "pros": [
+            "good when you want ORM ergonomics instead of writing raw SQL everywhere",
+            "feature-rich for common application patterns",
+            "useful for faster CRUD-heavy backend work",
+            "covers many typical API-layer data access needs"
+        ],
+        "cons": [
+            "less explicit than direct SQL in complex cases",
+            "can hide query details behind ORM abstractions",
+            "not always the best fit for highly tuned database access paths"
+        ],
+        "related": ["sqlx", "serde", "axum", "actix-web", "tokio"],
+        "source": "SeaORM official documentation",
+        "collected_at": "2026-04-24"
+    }
+]
