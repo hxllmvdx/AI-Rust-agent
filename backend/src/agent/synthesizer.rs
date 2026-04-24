@@ -4,6 +4,7 @@ use crate::{
     models::{execution::ExecutionResponse, ollama::OllamaMessage},
     services::llm::LlmService,
 };
+use serde_json::{Value, json};
 
 #[derive(Clone)]
 pub struct SynthesizerService {
@@ -32,7 +33,7 @@ impl SynthesizerService {
                 .join(", ")
         };
 
-        let tool_results_json = serde_json::to_string_pretty(&execution.results)?;
+        let tool_results_json = serde_json::to_string(&compact_tool_results(execution))?;
 
         let user_content = format!(
             "\
@@ -50,6 +51,9 @@ impl SynthesizerService {
         - If evidence is limited, say that clearly.
         - Do not invent scores or rankings.
         - Do not mention repositories unless they are present in the tool results.
+        - Keep the answer compact and practical.
+        - Prefer 4 short paragraphs or fewer.
+        - Avoid repeating the user question or restating the tool names.
 
         "
         );
@@ -69,4 +73,73 @@ impl SynthesizerService {
 
         self.llm.chat(messages).await
     }
+}
+
+fn compact_tool_results(execution: &ExecutionResponse) -> Value {
+    let results = execution
+        .results
+        .iter()
+        .map(|result| match result.tool_name.as_str() {
+            "local_knowledge_search" => json!({
+                "tool": result.tool_name,
+                "items": extract_local_items(&result.payload),
+            }),
+            "github_search" => json!({
+                "tool": result.tool_name,
+                "repos": extract_github_items(&result.payload),
+            }),
+            _ => json!({
+                "tool": result.tool_name,
+                "payload": result.payload,
+            }),
+        })
+        .collect::<Vec<_>>();
+
+    json!({ "results": results })
+}
+
+fn extract_local_items(payload: &Value) -> Vec<Value> {
+    payload
+        .as_array()
+        .into_iter()
+        .flatten()
+        .take(4)
+        .map(|item| {
+            json!({
+                "id": item.get("id"),
+                "title": item.get("title"),
+                "summary": item.get("summary"),
+                "pros": trim_array(item.get("pros"), 2),
+                "cons": trim_array(item.get("cons"), 2),
+            })
+        })
+        .collect()
+}
+
+fn extract_github_items(payload: &Value) -> Vec<Value> {
+    payload
+        .as_array()
+        .into_iter()
+        .flatten()
+        .take(4)
+        .map(|item| {
+            json!({
+                "full_name": item.get("full_name"),
+                "description": item.get("description"),
+                "language": item.get("language"),
+                "stargazers_count": item.get("stargazers_count"),
+                "updated_at": item.get("updated_at"),
+            })
+        })
+        .collect()
+}
+
+fn trim_array(value: Option<&Value>, limit: usize) -> Vec<Value> {
+    value
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .take(limit)
+        .cloned()
+        .collect()
 }

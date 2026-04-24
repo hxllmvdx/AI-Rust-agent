@@ -17,7 +17,8 @@ services:
             - ollama
         environment:
             OLLAMA_HOST: http://ollama:11434
-            OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:8b}
+            OLLAMA_PLANNER_MODEL: ${OLLAMA_PLANNER_MODEL:-qwen3:4b}
+            OLLAMA_SYNTHESIZER_MODEL: ${OLLAMA_SYNTHESIZER_MODEL:-qwen3:8b}
         entrypoint: ["/bin/sh", "-lc"]
         command: >
             "
@@ -25,9 +26,11 @@ services:
             until ollama list >/dev/null 2>&1; do
               sleep 2;
             done;
-            echo 'Pulling model' $$OLLAMA_MODEL;
-            ollama pull $$OLLAMA_MODEL;
-            echo 'Model pulled successfully.';
+            echo 'Pulling planner model' $$OLLAMA_PLANNER_MODEL;
+            ollama pull $$OLLAMA_PLANNER_MODEL;
+            echo 'Pulling synthesizer model' $$OLLAMA_SYNTHESIZER_MODEL;
+            ollama pull $$OLLAMA_SYNTHESIZER_MODEL;
+            echo 'Models pulled successfully.';
             "
 
     backend:

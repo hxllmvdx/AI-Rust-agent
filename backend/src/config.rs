@@ -21,7 +21,15 @@ fn default_ollama_url() -> String {
     "http://ollama:11434".to_string()
 }
 
-fn default_ollama_model() -> String {
+fn default_ollama_keep_alive() -> String {
+    "10m".to_string()
+}
+
+fn default_ollama_planner_model() -> String {
+    "qwen3:4b".to_string()
+}
+
+fn default_ollama_synthesizer_model() -> String {
     "qwen3:8b".to_string()
 }
 
@@ -36,14 +44,20 @@ pub struct Config {
     #[serde(default = "default_redis_url")]
     pub redis_url: String,
 
-    #[serde(default = "default_session_ttl")]
+    #[serde(default = "default_session_ttl", alias = "SESSION_TTL_SECS")]
     pub session_ttl: u64,
 
-    #[serde(default = "default_ollama_url")]
+    #[serde(default = "default_ollama_url", alias = "OLLAMA_BASE_URL")]
     pub ollama_url: String,
 
-    #[serde(default = "default_ollama_model")]
-    pub ollama_model: String,
+    #[serde(default = "default_ollama_planner_model")]
+    pub ollama_planner_model: String,
+
+    #[serde(default = "default_ollama_synthesizer_model")]
+    pub ollama_synthesizer_model: String,
+
+    #[serde(default = "default_ollama_keep_alive")]
+    pub ollama_keep_alive: String,
 
     pub github_token: Option<String>,
 }

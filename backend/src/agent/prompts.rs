@@ -13,6 +13,10 @@ Rules:
 - Use github_search for live repo data, popularity, activity, and repository discovery.
 - Use local_knowledge_search for comparisons, trade-offs, pros/cons, and curated knowledge.
 - Use both tools if the user asks for both comparison and live/current repository information.
+- For github_search, arguments.query must be a short GitHub search query with 2-6 key terms.
+- For github_search, remove filler words and rewrite broad requests into concise search keywords.
+- Example: "I'm looking for a Rust backend framework for my new project" -> "rust backend framework".
+- For local_knowledge_search, you may keep the original user wording if it helps retrieval.
 - If no tool is needed, return need_tools=false and tools=[].
 - Call at most 2 tools.
 - Return only valid JSON.

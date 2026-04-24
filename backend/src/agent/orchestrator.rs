@@ -41,24 +41,23 @@ impl OrchestratorService {
     }
 
     pub async fn execute(&self, user_message: &str) -> Result<ExecutionResponse, BackendError> {
-        let planner_started = std::time::Instant::now();
-        let raw_plan = self.planner.plan(user_message).await?;
-        tracing::info!("raw planner output: {:?}", raw_plan);
-        tracing::info!("planner took {:?}", planner_started.elapsed());
+        let raw_plan = if let Some(plan) = policy::fast_path_plan(user_message) {
+            tracing::info!("using fast-path planner for request");
+            plan
+        } else {
+            let planner_started = std::time::Instant::now();
+            let raw_plan = self.planner.plan(user_message).await?;
+            tracing::info!("raw planner output: {:?}", raw_plan);
+            tracing::info!("planner took {:?}", planner_started.elapsed());
+            raw_plan
+        };
 
         let policy_started = std::time::Instant::now();
         let plan = policy::apply_tool_policy(user_message, raw_plan);
         tracing::info!("filtered planner output: {:?}", plan);
         tracing::info!("policy filtering took {:?}", policy_started.elapsed());
 
-        let mut tool_results = Vec::new();
-
-        for tool_call in &plan.tools {
-            let tool_started = std::time::Instant::now();
-            let result = self.execute_tool(tool_call).await?;
-            tracing::info!("tool {} took {:?}", tool_call.name, tool_started.elapsed());
-            tool_results.push(result);
-        }
+        let tool_results = self.execute_tools(&plan).await?;
 
         Ok(ExecutionResponse {
             plan,
@@ -74,7 +73,7 @@ impl OrchestratorService {
         let chat_started = std::time::Instant::now();
 
         self.sessions
-            .update_session(
+            .append_message(
                 session_id,
                 ConversationMessage {
                     role: "user".to_string(),
@@ -83,11 +82,26 @@ impl OrchestratorService {
             )
             .await?;
 
+        if let Some(answer) = policy::fast_path_response(user_message) {
+            self.sessions
+                .append_message(
+                    session_id,
+                    ConversationMessage {
+                        role: "assistant".to_string(),
+                        content: answer.clone(),
+                    },
+                )
+                .await?;
+
+            tracing::info!("handle_chat took {:?}", chat_started.elapsed());
+            return Ok((answer, Vec::new()));
+        }
+
         let execution = self.execute(user_message).await?;
 
         if !execution.plan.tools.is_empty() {
             self.sessions
-                .update_session(
+                .append_message(
                     session_id,
                     ConversationMessage {
                         role: "tool".to_string(),
@@ -115,7 +129,7 @@ impl OrchestratorService {
         tracing::info!("synthesizer took {:?}", synth_started.elapsed());
 
         self.sessions
-            .update_session(
+            .append_message(
                 session_id,
                 ConversationMessage {
                     role: "assistant".to_string(),
@@ -134,6 +148,45 @@ impl OrchestratorService {
         tracing::info!("handle_chat took {:?}", chat_started.elapsed());
 
         Ok((answer, used_tools))
+    }
+
+    async fn execute_tools(
+        &self,
+        plan: &crate::models::tool::ToolPlan,
+    ) -> Result<Vec<ToolExecutionResult>, BackendError> {
+        match plan.tools.as_slice() {
+            [] => Ok(Vec::new()),
+            [tool] => {
+                let tool_started = std::time::Instant::now();
+                let result = self.execute_tool(tool).await?;
+                tracing::info!("tool {} took {:?}", tool.name, tool_started.elapsed());
+                Ok(vec![result])
+            }
+            [first, second] => {
+                let started = std::time::Instant::now();
+                let first_name = first.name.clone();
+                let second_name = second.name.clone();
+                let (first_result, second_result) =
+                    tokio::try_join!(self.execute_tool(first), self.execute_tool(second))?;
+                tracing::info!(
+                    "tools {} and {} took {:?}",
+                    first_name,
+                    second_name,
+                    started.elapsed()
+                );
+                Ok(vec![first_result, second_result])
+            }
+            _ => {
+                let mut tool_results = Vec::with_capacity(plan.tools.len());
+                for tool_call in &plan.tools {
+                    let tool_started = std::time::Instant::now();
+                    let result = self.execute_tool(tool_call).await?;
+                    tracing::info!("tool {} took {:?}", tool_call.name, tool_started.elapsed());
+                    tool_results.push(result);
+                }
+                Ok(tool_results)
+            }
+        }
     }
 
     async fn execute_tool(
