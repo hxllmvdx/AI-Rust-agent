@@ -1,7 +1,7 @@
 use crate::{
     agent::prompts::synthesizer_system_prompt,
     error::BackendError,
-    models::{execution::ExecutionResponse, ollama::OllamaMessage, sessions::ConversationMessage},
+    models::{execution::ExecutionResponse, openrouter::LlmMessage, sessions::ConversationMessage},
     services::llm::LlmService,
 };
 use serde_json::{Value, json};
@@ -82,12 +82,12 @@ impl SynthesizerService {
         }
 
         let messages = vec![
-            OllamaMessage {
+            LlmMessage {
                 role: "system".to_string(),
 
                 content: synthesizer_system_prompt(),
             },
-            OllamaMessage {
+            LlmMessage {
                 role: "user".to_string(),
 
                 content: user_content,

@@ -19,4 +19,7 @@ pub enum BackendError {
 
     #[error("http client error: {0}")]
     ReqwestError(#[from] reqwest::Error),
+
+    #[error("llm response error: {0}")]
+    InvalidLlmResponse(String),
 }

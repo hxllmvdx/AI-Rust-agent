@@ -4,41 +4,10 @@ services:
         ports:
             - "6379:6379"
 
-    ollama:
-        image: ollama/ollama:latest
-        ports:
-            - "11434:11434"
-        volumes:
-            - ollama_data:/root/.ollama
-
-    ollama-init:
-        image: ollama/ollama:latest
-        depends_on:
-            - ollama
-        environment:
-            OLLAMA_HOST: http://ollama:11434
-            OLLAMA_PLANNER_MODEL: ${OLLAMA_PLANNER_MODEL:-qwen3:8b}
-            OLLAMA_SYNTHESIZER_MODEL: ${OLLAMA_SYNTHESIZER_MODEL:-qwen3:8b}
-        entrypoint: ["/bin/sh", "-lc"]
-        command: >
-            "
-            echo 'Waiting for Ollama API...';
-            until ollama list >/dev/null 2>&1; do
-              sleep 2;
-            done;
-            echo 'Pulling planner model' $$OLLAMA_PLANNER_MODEL;
-            ollama pull $$OLLAMA_PLANNER_MODEL;
-            echo 'Pulling synthesizer model' $$OLLAMA_SYNTHESIZER_MODEL;
-            ollama pull $$OLLAMA_SYNTHESIZER_MODEL;
-            echo 'Models pulled successfully.';
-            "
-
     backend:
         build: ./backend
         depends_on:
             - redis
-            - ollama
-            - ollama-init
         env_file:
             - .env
         ports:
@@ -52,6 +21,3 @@ services:
             BACKEND_URL: http://backend:8080
         ports:
             - "8501:8501"
-
-volumes:
-    ollama_data:

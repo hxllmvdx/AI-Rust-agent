@@ -17,28 +17,24 @@ fn default_session_ttl() -> u64 {
     60 * 60 * 24
 }
 
-fn default_ollama_url() -> String {
-    "http://ollama:11434".to_string()
+fn default_openrouter_base_url() -> String {
+    "https://openrouter.ai/api/v1".to_string()
 }
 
-fn default_ollama_keep_alive() -> String {
-    "10m".to_string()
+fn default_openrouter_planner_model() -> String {
+    "openrouter/free".to_string()
 }
 
-fn default_ollama_planner_model() -> String {
-    "qwen3:8b".to_string()
+fn default_openrouter_synthesizer_model() -> String {
+    "openrouter/free".to_string()
 }
 
-fn default_ollama_synthesizer_model() -> String {
-    "qwen3:8b".to_string()
-}
-
-fn default_ollama_planner_thinking() -> bool {
+fn default_openrouter_planner_reasoning() -> bool {
     false
 }
 
-fn default_ollama_synthesizer_thinking() -> bool {
-    true
+fn default_openrouter_synthesizer_reasoning() -> bool {
+    false
 }
 
 fn default_crates_api_base_url() -> String {
@@ -68,23 +64,38 @@ pub struct Config {
     #[serde(default = "default_session_ttl", alias = "SESSION_TTL_SECS")]
     pub session_ttl: u64,
 
-    #[serde(default = "default_ollama_url", alias = "OLLAMA_BASE_URL")]
-    pub ollama_url: String,
+    #[serde(
+        default = "default_openrouter_base_url",
+        alias = "OPENROUTER_URL",
+        alias = "OLLAMA_BASE_URL"
+    )]
+    pub openrouter_base_url: String,
 
-    #[serde(default = "default_ollama_planner_model")]
-    pub ollama_planner_model: String,
+    pub openrouter_api_key: String,
 
-    #[serde(default = "default_ollama_synthesizer_model")]
-    pub ollama_synthesizer_model: String,
+    #[serde(
+        default = "default_openrouter_planner_model",
+        alias = "OLLAMA_PLANNER_MODEL"
+    )]
+    pub openrouter_planner_model: String,
 
-    #[serde(default = "default_ollama_keep_alive")]
-    pub ollama_keep_alive: String,
+    #[serde(
+        default = "default_openrouter_synthesizer_model",
+        alias = "OLLAMA_SYNTHESIZER_MODEL"
+    )]
+    pub openrouter_synthesizer_model: String,
 
-    #[serde(default = "default_ollama_planner_thinking")]
-    pub ollama_planner_thinking: bool,
+    #[serde(
+        default = "default_openrouter_planner_reasoning",
+        alias = "OLLAMA_PLANNER_THINKING"
+    )]
+    pub openrouter_planner_reasoning: bool,
 
-    #[serde(default = "default_ollama_synthesizer_thinking")]
-    pub ollama_synthesizer_thinking: bool,
+    #[serde(
+        default = "default_openrouter_synthesizer_reasoning",
+        alias = "OLLAMA_SYNTHESIZER_THINKING"
+    )]
+    pub openrouter_synthesizer_reasoning: bool,
 
     #[serde(default = "default_crates_api_base_url")]
     pub crates_api_base_url: String,

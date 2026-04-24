@@ -43,22 +43,22 @@ async fn main() -> anyhow::Result<()> {
     let session_store = SessionStore::new(redis_client, config.session_ttl);
 
     let llm = LlmService::new(
-        config.ollama_url.clone(),
-        config.ollama_synthesizer_model.clone(),
-        config.ollama_keep_alive.clone(),
-        Some(config.ollama_synthesizer_thinking),
+        config.openrouter_base_url.clone(),
+        config.openrouter_api_key.clone(),
+        config.openrouter_synthesizer_model.clone(),
+        config.openrouter_synthesizer_reasoning,
     );
     let planner_llm = LlmService::new(
-        config.ollama_url.clone(),
-        config.ollama_planner_model.clone(),
-        config.ollama_keep_alive.clone(),
-        Some(config.ollama_planner_thinking),
+        config.openrouter_base_url.clone(),
+        config.openrouter_api_key.clone(),
+        config.openrouter_planner_model.clone(),
+        config.openrouter_planner_reasoning,
     );
     let synthesizer_llm = LlmService::new(
-        config.ollama_url.clone(),
-        config.ollama_synthesizer_model.clone(),
-        config.ollama_keep_alive.clone(),
-        Some(config.ollama_synthesizer_thinking),
+        config.openrouter_base_url.clone(),
+        config.openrouter_api_key.clone(),
+        config.openrouter_synthesizer_model.clone(),
+        config.openrouter_synthesizer_reasoning,
     );
     let planner = PlannerService::new(planner_llm);
     let synthesizer = SynthesizerService::new(synthesizer_llm);

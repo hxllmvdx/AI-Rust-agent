@@ -3,85 +3,121 @@ use serde::de::DeserializeOwned;
 
 use crate::{
     error::BackendError,
-    models::ollama::{OllamaChatRequest, OllamaChatResponse, OllamaMessage},
+    models::openrouter::{
+        LlmMessage, OpenRouterChatRequest, OpenRouterChatResponse, OpenRouterJsonSchema,
+        OpenRouterPlugin, OpenRouterReasoning, OpenRouterResponseFormat,
+    },
 };
 
 #[derive(Clone)]
 pub struct LlmService {
     http: Client,
     base_url: String,
+    api_key: String,
     model: String,
-    keep_alive: String,
-    think: Option<bool>,
+    reasoning_enabled: bool,
 }
 
 impl LlmService {
-    pub fn new(base_url: String, model: String, keep_alive: String, think: Option<bool>) -> Self {
+    pub fn new(base_url: String, api_key: String, model: String, reasoning_enabled: bool) -> Self {
         Self {
             http: Client::new(),
             base_url,
+            api_key,
             model,
-            keep_alive,
-            think,
+            reasoning_enabled,
         }
     }
 
-    pub async fn chat(&self, messages: Vec<OllamaMessage>) -> Result<String, BackendError> {
-        let request = OllamaChatRequest {
+    pub async fn chat(&self, messages: Vec<LlmMessage>) -> Result<String, BackendError> {
+        let request = OpenRouterChatRequest {
             model: self.model.clone(),
             messages,
             stream: false,
-            keep_alive: self.keep_alive.clone(),
-            think: self.think,
-            format: None,
+            reasoning: self.reasoning_config(),
+            response_format: None,
+            plugins: None,
         };
 
-        tracing::info!("sending request to ollama: model={}", self.model);
-        let response = self
-            .http
-            .post(format!("{}/api/chat", self.base_url))
-            .json(&request)
-            .send()
-            .await?
-            .error_for_status()?
-            .json::<OllamaChatResponse>()
-            .await?;
+        tracing::info!("sending request to openrouter: model={}", self.model);
+        let response = self.send_request(request).await?;
 
-        Ok(response.message.content)
+        Self::extract_content(response)
     }
 
     pub async fn chat_json<T: DeserializeOwned>(
         &self,
-        messages: Vec<OllamaMessage>,
+        messages: Vec<LlmMessage>,
         schema: serde_json::Value,
     ) -> Result<T, BackendError> {
-        let request = OllamaChatRequest {
+        let request = OpenRouterChatRequest {
             model: self.model.clone(),
             messages,
             stream: false,
-            keep_alive: self.keep_alive.clone(),
-            think: self.think,
-            format: Some(schema),
+            reasoning: None,
+            response_format: Some(OpenRouterResponseFormat {
+                format_type: "json_schema".to_string(),
+                json_schema: Some(OpenRouterJsonSchema {
+                    name: "planner_response".to_string(),
+                    strict: true,
+                    schema,
+                }),
+            }),
+            plugins: Some(vec![OpenRouterPlugin {
+                id: "response-healing".to_string(),
+            }]),
         };
 
-        let response = self
-            .http
-            .post(format!("{}/api/chat", self.base_url))
-            .json(&request)
-            .send()
-            .await?
-            .error_for_status()?
-            .json::<OllamaChatResponse>()
-            .await?;
-
-        let parsed = serde_json::from_str::<T>(&response.message.content)?;
+        let response = self.send_request(request).await?;
+        let content = Self::extract_content(response)?;
+        let parsed = serde_json::from_str::<T>(&content)?;
 
         Ok(parsed)
     }
 
+    async fn send_request(
+        &self,
+        request: OpenRouterChatRequest,
+    ) -> Result<OpenRouterChatResponse, BackendError> {
+        self.http
+            .post(format!(
+                "{}/chat/completions",
+                self.base_url.trim_end_matches('/')
+            ))
+            .bearer_auth(&self.api_key)
+            .header("Content-Type", "application/json")
+            .json(&request)
+            .send()
+            .await?
+            .error_for_status()?
+            .json::<OpenRouterChatResponse>()
+            .await
+            .map_err(BackendError::from)
+    }
+
+    fn extract_content(response: OpenRouterChatResponse) -> Result<String, BackendError> {
+        response
+            .choices
+            .into_iter()
+            .next()
+            .and_then(|choice| choice.message.content)
+            .filter(|content| !content.trim().is_empty())
+            .ok_or_else(|| {
+                BackendError::InvalidLlmResponse(format!(
+                    "empty chat completion payload from model {}",
+                    response.model
+                ))
+            })
+    }
+
+    fn reasoning_config(&self) -> Option<OpenRouterReasoning> {
+        self.reasoning_enabled
+            .then_some(OpenRouterReasoning { enabled: true })
+    }
+
     pub async fn simple_user_prompt(&self, prompt: &str) -> Result<String, BackendError> {
-        tracing::info!("sending request to ollama: model={}", self.model);
-        self.chat(vec![OllamaMessage {
+        tracing::info!("sending request to openrouter: model={}", self.model);
+        self.chat(vec![LlmMessage {
             role: "user".to_string(),
             content: prompt.to_string(),
         }])

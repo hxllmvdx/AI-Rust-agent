@@ -3,7 +3,7 @@ use serde_json::json;
 use crate::{
     agent::prompts::planner_system_prompt,
     error::BackendError,
-    models::{ollama::OllamaMessage, tool::ToolPlan},
+    models::{openrouter::LlmMessage, tool::ToolPlan},
     services::llm::LlmService,
 };
 
@@ -44,11 +44,11 @@ impl PlannerService {
         });
 
         let messages = vec![
-            OllamaMessage {
+            LlmMessage {
                 role: "system".to_string(),
                 content: planner_system_prompt(),
             },
-            OllamaMessage {
+            LlmMessage {
                 role: "user".to_string(),
                 content: format!("User question: {user_message}"),
             },
