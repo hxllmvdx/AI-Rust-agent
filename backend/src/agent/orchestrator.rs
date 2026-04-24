@@ -106,16 +106,7 @@ impl OrchestratorService {
                     ConversationMessage {
                         role: "tool".to_string(),
 
-                        content: format!(
-                            "Used tools: {}",
-                            execution
-                                .plan
-                                .tools
-                                .iter()
-                                .map(|t| format!("{}({})", t.name, t.arguments.query))
-                                .collect::<Vec<_>>()
-                                .join(", ")
-                        ),
+                        content: describe_tool_activity(&execution),
                     },
                 )
                 .await?;
@@ -158,8 +149,13 @@ impl OrchestratorService {
             [] => Ok(Vec::new()),
             [tool] => {
                 let tool_started = std::time::Instant::now();
-                let result = self.execute_tool(tool).await?;
-                tracing::info!("tool {} took {:?}", tool.name, tool_started.elapsed());
+                let result = self.execute_tool(tool).await;
+                tracing::info!(
+                    "tool {} took {:?} (success={})",
+                    tool.name,
+                    tool_started.elapsed(),
+                    result.success
+                );
                 Ok(vec![result])
             }
             [first, second] => {
@@ -167,12 +163,14 @@ impl OrchestratorService {
                 let first_name = first.name.clone();
                 let second_name = second.name.clone();
                 let (first_result, second_result) =
-                    tokio::try_join!(self.execute_tool(first), self.execute_tool(second))?;
+                    tokio::join!(self.execute_tool(first), self.execute_tool(second));
                 tracing::info!(
-                    "tools {} and {} took {:?}",
+                    "tools {} and {} took {:?} (successes: {}, {})",
                     first_name,
                     second_name,
-                    started.elapsed()
+                    started.elapsed(),
+                    first_result.success,
+                    second_result.success
                 );
                 Ok(vec![first_result, second_result])
             }
@@ -180,8 +178,13 @@ impl OrchestratorService {
                 let mut tool_results = Vec::with_capacity(plan.tools.len());
                 for tool_call in &plan.tools {
                     let tool_started = std::time::Instant::now();
-                    let result = self.execute_tool(tool_call).await?;
-                    tracing::info!("tool {} took {:?}", tool_call.name, tool_started.elapsed());
+                    let result = self.execute_tool(tool_call).await;
+                    tracing::info!(
+                        "tool {} took {:?} (success={})",
+                        tool_call.name,
+                        tool_started.elapsed(),
+                        result.success
+                    );
                     tool_results.push(result);
                 }
                 Ok(tool_results)
@@ -189,37 +192,61 @@ impl OrchestratorService {
         }
     }
 
-    async fn execute_tool(
-        &self,
-        tool_call: &ToolCall,
-    ) -> Result<ToolExecutionResult, BackendError> {
+    async fn execute_tool(&self, tool_call: &ToolCall) -> ToolExecutionResult {
         match tool_call.name.as_str() {
             "local_knowledge_search" => {
                 let results = self.local_tool.search(&tool_call.arguments.query, 5);
-                Ok(ToolExecutionResult {
-                    tool_name: tool_call.name.clone(),
-                    payload: to_value(results)?,
-                })
+                match to_value(results) {
+                    Ok(payload) => ToolExecutionResult::success(tool_call.name.clone(), payload),
+                    Err(err) => {
+                        tracing::warn!("tool {} failed: {:?}", tool_call.name, err);
+                        ToolExecutionResult::failure(
+                            tool_call.name.clone(),
+                            format!("serialization failed: {err}"),
+                        )
+                    }
+                }
             }
-            "github_search" => {
-                let result = self
-                    .github_tool
-                    .search(&tool_call.arguments.query, 5)
-                    .await?;
-                Ok(ToolExecutionResult {
-                    tool_name: tool_call.name.clone(),
-                    payload: to_value(result)?,
-                })
-            }
+            "github_search" => match self.github_tool.search(&tool_call.arguments.query, 5).await {
+                Ok(result) => match to_value(result) {
+                    Ok(payload) => ToolExecutionResult::success(tool_call.name.clone(), payload),
+                    Err(err) => {
+                        tracing::warn!("tool {} failed: {:?}", tool_call.name, err);
+                        ToolExecutionResult::failure(
+                            tool_call.name.clone(),
+                            format!("serialization failed: {err}"),
+                        )
+                    }
+                },
+                Err(err) => {
+                    tracing::warn!("tool {} failed: {:?}", tool_call.name, err);
+                    ToolExecutionResult::failure(tool_call.name.clone(), err.to_string())
+                }
+            },
             _ => {
                 tracing::warn!("unknown tool requested by planner: {}", tool_call.name);
-                Ok(ToolExecutionResult {
-                    tool_name: tool_call.name.clone(),
-                    payload: serde_json::json!({
-                        "error": "unknown tool"
-                    }),
-                })
+                ToolExecutionResult::failure(tool_call.name.clone(), "unknown tool".to_string())
             }
         }
     }
+}
+
+fn describe_tool_activity(execution: &ExecutionResponse) -> String {
+    let activity = execution
+        .plan
+        .tools
+        .iter()
+        .map(|tool| {
+            let status = execution
+                .results
+                .iter()
+                .find(|result| result.tool_name == tool.name)
+                .map(|result| if result.success { "ok" } else { "failed" })
+                .unwrap_or("unknown");
+            format!("{}({}) [{status}]", tool.name, tool.arguments.query)
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    format!("Used tools: {activity}")
 }

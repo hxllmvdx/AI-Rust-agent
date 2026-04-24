@@ -34,6 +34,7 @@ impl SynthesizerService {
         };
 
         let tool_results_json = serde_json::to_string(&compact_tool_results(execution))?;
+        let has_successful_tool = execution.results.iter().any(|result| result.success);
 
         let user_content = format!(
             "\
@@ -48,6 +49,8 @@ impl SynthesizerService {
 
         Instructions:
         - Use only the information present in the tool results.
+        - Some tools may have failed. If so, explicitly present a partial answer based on the successful tools.
+        - Never claim a failed tool returned no data; say the tool failed or was unavailable.
         - If evidence is limited, say that clearly.
         - Do not invent scores or rankings.
         - Do not mention repositories unless they are present in the tool results.
@@ -57,6 +60,13 @@ impl SynthesizerService {
 
         "
         );
+
+        if !has_successful_tool {
+            return Ok(
+                "I couldn't complete the full lookup because the requested tools failed. Please try again in a moment."
+                    .to_string(),
+            );
+        }
 
         let messages = vec![
             OllamaMessage {
@@ -79,17 +89,25 @@ fn compact_tool_results(execution: &ExecutionResponse) -> Value {
     let results = execution
         .results
         .iter()
-        .map(|result| match result.tool_name.as_str() {
-            "local_knowledge_search" => json!({
+        .map(|result| match (result.tool_name.as_str(), result.success) {
+            (_, false) => json!({
                 "tool": result.tool_name,
-                "items": extract_local_items(&result.payload),
+                "status": "failed",
+                "error": result.error,
             }),
-            "github_search" => json!({
+            ("local_knowledge_search", true) => json!({
                 "tool": result.tool_name,
-                "repos": extract_github_items(&result.payload),
+                "status": "ok",
+                "items": extract_local_items(result.payload.as_ref()),
+            }),
+            ("github_search", true) => json!({
+                "tool": result.tool_name,
+                "status": "ok",
+                "repos": extract_github_items(result.payload.as_ref()),
             }),
             _ => json!({
                 "tool": result.tool_name,
+                "status": "ok",
                 "payload": result.payload,
             }),
         })
@@ -98,9 +116,9 @@ fn compact_tool_results(execution: &ExecutionResponse) -> Value {
     json!({ "results": results })
 }
 
-fn extract_local_items(payload: &Value) -> Vec<Value> {
+fn extract_local_items(payload: Option<&Value>) -> Vec<Value> {
     payload
-        .as_array()
+        .and_then(Value::as_array)
         .into_iter()
         .flatten()
         .take(4)
@@ -116,9 +134,9 @@ fn extract_local_items(payload: &Value) -> Vec<Value> {
         .collect()
 }
 
-fn extract_github_items(payload: &Value) -> Vec<Value> {
+fn extract_github_items(payload: Option<&Value>) -> Vec<Value> {
     payload
-        .as_array()
+        .and_then(Value::as_array)
         .into_iter()
         .flatten()
         .take(4)
