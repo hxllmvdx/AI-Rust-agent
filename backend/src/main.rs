@@ -1,5 +1,13 @@
-use crate::agent::planner::PlannerService;
-use api::{debug_llm, debug_plan, health, sessions};
+use crate::{
+    agent::{
+        orchestrator::OrchestratorService, planner::PlannerService, synthesizer::SynthesizerService,
+    },
+    tools::{github::GitHubTool, local_data::LocalKnowledgeTool},
+};
+use api::{
+    chat, debug_execute, debug_github_search, debug_llm, debug_local_search, debug_plan, health,
+    sessions,
+};
 use axum::{
     Router,
     routing::{get, post},
@@ -18,6 +26,7 @@ pub mod error;
 pub mod models;
 pub mod services;
 pub mod state;
+pub mod tools;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -35,24 +44,48 @@ async fn main() -> anyhow::Result<()> {
 
     let llm = LlmService::new(config.ollama_url.clone(), config.ollama_model.clone());
     let planner = PlannerService::new(llm.clone());
+    let synthesizer = SynthesizerService::new(llm.clone());
+
+    let local_tool = LocalKnowledgeTool::load_from_file("/app/data/rust_tools.json")?;
+
+    let github_tool = GitHubTool::new(config.github_token.clone());
+
+    let orchestrator = OrchestratorService::new(
+        planner.clone(),
+        synthesizer.clone(),
+        local_tool.clone(),
+        github_tool.clone(),
+        session_store.clone(),
+    );
 
     let state = AppState {
         app_name: "ai-rust-agent".to_string(),
         sessions: session_store,
+        synthesizer: synthesizer,
         llm: llm,
         planner: planner,
+        local_tool: local_tool,
+        github_tool: github_tool,
+        orchestrator: orchestrator,
     };
 
     let app = Router::new()
         .route("/health", get(health::health_handler))
         .route("/sessions", post(sessions::create_session_handler))
-        .route(
-            "/history/{session_id}",
-            get(sessions::create_session_handler),
-        )
+        .route("/history/{session_id}", get(sessions::get_history_handler))
         .route("/reset/{session_id}", post(sessions::reset_session_handler))
         .route("/debug/llm", post(debug_llm::debug_llm_handler))
         .route("/debug/plan", post(debug_plan::debug_plan_handler))
+        .route(
+            "/debug/local-search",
+            post(debug_local_search::debug_local_search_handler),
+        )
+        .route(
+            "/debug/github-search",
+            post(debug_github_search::debug_github_search_handler),
+        )
+        .route("/debug/execute", post(debug_execute::debug_execute_handler))
+        .route("/chat", post(chat::chat_handler))
         .layer(TraceLayer::new_for_http())
         .with_state(state);
 

@@ -15,6 +15,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=builder /app/target/release/backend /usr/local/bin/backend
 
+COPY data /app/data
+
 EXPOSE 8080
 
 CMD ["backend"]

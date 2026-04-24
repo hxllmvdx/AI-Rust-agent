@@ -1,3 +1,39 @@
-.python-version
-*/target
+# ===== OS / editors =====
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# ===== Environment / secrets =====
 .env
+.env.*
+!.env.example
+backend/.env
+frontend/.env
+
+# ===== Rust =====
+/target/
+**/target/
+
+# ===== Python / uv / Streamlit =====
+frontend/.venv/
+frontend/__pycache__/
+frontend/*.pyc
+
+# ===== Streamlit =====
+.streamlit/
+frontend/.streamlit/
+
+# ===== Logs / runtime =====
+*.log
+logs/
+tmp/
+temp/
+
+# ===== Testing / coverage =====
+.coverage
+htmlcov/
+.pytest_cache/
+
+# ===== Docker =====
+docker

@@ -44,6 +44,8 @@ pub struct Config {
 
     #[serde(default = "default_ollama_model")]
     pub ollama_model: String,
+
+    pub github_token: Option<String>,
 }
 
 impl Config {
